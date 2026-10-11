@@ -216,3 +216,33 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# BeeDoo : dépôt PUBLIC. Rien de personnel ne doit être committé.
+# ---------------------------------------------------------------------------
+# Données personnelles : visages, conversations, mémoire, réglages
+data/
+
+# Secrets : seul .env.example (sans valeurs) est versionné
+.env.*
+!.env.example
+
+# Configuration locale de la machine et de l'assistant
+agents.local.md
+.claude/settings.local.json
+.claude/*.local.*
+
+# Photos et sons (un visage ou une voix sont des données personnelles).
+# Pour une image de documentation, la placer dans docs/.
+/*.jpg
+/*.jpeg
+/*.png
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.ogg
+
+# Sorties des scripts
+beedoo_picture.jpg
+beedoo_state.json

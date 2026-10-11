@@ -1,0 +1,16 @@
+# BeeDoo - Configuration locale
+
+Copie ce fichier en `agents.local.md` (ignoré par git) et adapte-le à ta machine.
+Il sert de mémoire aux sessions d'un assistant IA. Ne mets ici ni clé API, ni nom de personne, ni donnée personnelle.
+
+## Environnement
+
+- Robot : Reachy Mini Lite (USB) ou Wireless
+- OS : macOS / Linux / Windows
+- Shell : zsh / bash
+- Venv : ./.venv (standard, pas uv)
+- SDK : ./reachy_mini (sous-module git, lecture seule)
+
+## Notes
+
+- Si l'application officielle "Reachy Mini Control" est installée, ne pas lancer son daemon en même temps que le tien (même port 8000).
