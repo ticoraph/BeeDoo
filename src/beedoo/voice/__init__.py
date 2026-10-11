@@ -1,1 +1,1 @@
-"""Voix : écoute (VAD, STT) et parole (TTS) avec ElevenLabs (phase 5)."""
+"""Voix : écoute (VAD, STT) et parole (TTS) avec OpenAI (phase 5)."""

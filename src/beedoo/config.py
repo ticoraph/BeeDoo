@@ -15,13 +15,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 @dataclass(frozen=True)
 class Config:
-    """Réglages lus dans l'environnement. Les clés n'apparaissent jamais dans repr()."""
+    """Réglages lus dans l'environnement. La clé n'apparaît jamais dans repr()."""
 
     data_dir: Path
     openai_model: str
+    stt_model: str
+    tts_model: str
+    tts_voice: str
     openai_api_key: str = field(default="", repr=False)
-    elevenlabs_api_key: str = field(default="", repr=False)
-    elevenlabs_voice_id: str = ""
 
     @classmethod
     def load(cls, env_file: Path | None = None) -> "Config":
@@ -29,16 +30,12 @@ class Config:
         return cls(
             data_dir=Path(os.environ.get("BEEDOO_DATA_DIR") or REPO_ROOT / "data"),
             openai_model=os.environ.get("OPENAI_MODEL") or "gpt-6-luna",
+            stt_model=os.environ.get("OPENAI_STT_MODEL") or "gpt-4o-transcribe",
+            tts_model=os.environ.get("OPENAI_TTS_MODEL") or "gpt-4o-mini-tts",
+            tts_voice=os.environ.get("OPENAI_TTS_VOICE") or "fable",
             openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
-            elevenlabs_api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
-            elevenlabs_voice_id=os.environ.get("ELEVENLABS_VOICE_ID", ""),
         )
 
     def missing_keys(self) -> list[str]:
         """Noms des variables d'environnement obligatoires qui sont vides."""
-        required = {
-            "OPENAI_API_KEY": self.openai_api_key,
-            "ELEVENLABS_API_KEY": self.elevenlabs_api_key,
-            "ELEVENLABS_VOICE_ID": self.elevenlabs_voice_id,
-        }
-        return [name for name, value in required.items() if not value]
+        return [] if self.openai_api_key else ["OPENAI_API_KEY"]

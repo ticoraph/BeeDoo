@@ -8,7 +8,7 @@ BeeDoo est un robot d'accompagnement basé sur un [Reachy Mini](https://github.c
 
 - Un Reachy Mini (Lite, branché en USB, ou Wireless), ou le mode simulation du SDK pour essayer sans robot.
 - Python 3.12 et git.
-- Pour la conversation (à venir) : une clé API OpenAI et une clé API ElevenLabs.
+- Pour la conversation (à venir) : une clé API OpenAI (LLM, reconnaissance vocale et synthèse vocale).
 
 ## Installation
 
@@ -57,7 +57,7 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 
 - Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné.
 - Les clés API sont dans `.env`, qui n'est jamais versionné.
-- La reconnaissance de visage tourne en local. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI et ElevenLabs. Informe les personnes concernées et respecte leur choix.
+- La reconnaissance de visage tourne en local. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI. Informe les personnes concernées et respecte leur choix.
 - Si tu contribues : lis les règles de la section « Dépôt public » de [CLAUDE.md](CLAUDE.md). Ne pousse jamais de photo, d'enregistrement ou de vraie conversation.
 
 ## Organisation du dépôt
