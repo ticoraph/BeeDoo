@@ -29,6 +29,6 @@ jobs:
         with:
           python-version: "3.12"
       # Les tests de configuration n'ont pas besoin du SDK (lourd) : installation sans dépendances.
-      - run: pip install pre-commit pytest python-dotenv && pip install --no-deps -e .
+      - run: pip install pre-commit pytest python-dotenv numpy && pip install --no-deps -e .
       - run: pre-commit run --all-files
       - run: pytest
