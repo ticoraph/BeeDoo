@@ -16,6 +16,10 @@ dependencies = [
 keywords = ["reachy-mini-app"]
 
 [project.optional-dependencies]
+# Reconnaissance de visage (voir docs/DECISIONS.md : conflit possible entre paquets OpenCV).
+vision = [
+    "deepface",
+]
 dev = [
     "pytest",
     "pre-commit",
