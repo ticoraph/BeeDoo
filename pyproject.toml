@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beedoo"
+version = "0.1.0"
+description = "BeeDoo : robot d'accompagnement qui parle français comme un enfant de 7 ans (Reachy Mini)."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "reachy-mini",
+    "python-dotenv",
+]
+keywords = ["reachy-mini-app"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pre-commit",
+]
+
+# Point d'entrée lu par le SDK Reachy Mini pour lancer l'application.
+[project.entry-points."reachy_mini_apps"]
+beedoo = "beedoo.main:Beedoo"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

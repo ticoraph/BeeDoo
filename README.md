@@ -17,16 +17,21 @@ BeeDoo est un robot d'accompagnement basé sur un [Reachy Mini](https://github.c
 git clone --recurse-submodules https://github.com/ticoraph/BeeDoo.git
 cd BeeDoo
 
-# 2. Créer l'environnement Python et installer les dépendances
+# 2. Créer l'environnement Python et installer BeeDoo (avec les outils de développement)
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 3. Préparer la configuration (à compléter quand l'application utilisera les clés)
+# 3. Activer les garde-fous contre les fuites de secrets (si tu contribues)
+pre-commit install
+
+# 4. Préparer la configuration (à compléter quand l'application utilisera les clés)
 cp .env.example .env
 ```
 
 Si tu as cloné sans `--recurse-submodules` : `git submodule update --init`.
+
+Vérifier que tout est en place : `pytest`.
 
 ## Essayer le robot
 
@@ -61,6 +66,8 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 |---|---|
 | `docs/` | Vision, plan, décisions |
 | `prompts/` | Personnalité de BeeDoo (prompt du LLM) |
+| `src/beedoo/` | Code de l'application (gestes, vision, voix, LLM, mémoire, mini-apps, interface) |
+| `tests/` | Tests |
 | `scripts/` | Petits outils (photo, enregistrement audio) |
 | `examples/` | Essais de connexion au robot |
 | `reachy_mini/` | SDK officiel (sous-module git, lecture seule) |

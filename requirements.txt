@@ -1,1 +1,1 @@
-reachy-mini
+-e .[dev]
