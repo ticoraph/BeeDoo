@@ -21,10 +21,10 @@ repos:
       # Filet de sécurité si quelqu'un force l'ajout d'un fichier ignoré (git add -f).
       - id: forbid-personal-files
         name: interdit .env, data/, photos et sons
-        entry: "Fichier personnel interdit dans le dépôt (voir CLAUDE.md, section Dépôt public)"
+        entry: "Fichier personnel interdit dans le dépôt (voir README, section Vie privée)"
         language: fail
         files: '(^|/)(\.env(\..*)?|data/.*|.*\.(wav|mp3|flac|m4a|ogg|jpe?g|png))$'
-        exclude: '(^\.env\.example$|^docs/)'
+        exclude: '^\.env\.example$'
 
       # Chemins absolus d'une machine personnelle.
       - id: forbid-personal-paths

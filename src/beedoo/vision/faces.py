@@ -10,7 +10,7 @@ DeepFace est une dépendance optionnelle (`pip install deepface`) : seule l'extr
 d'empreintes en a besoin, la comparaison et le stockage non.
 
 SEUILS PROVISOIRES : valeurs publiées par DeepFace, pas encore calibrées sur nos images.
-Voir docs/DECISIONS.md (essai S3).
+Voir l'essai S3 (scripts/spikes/s3_threshold.py).
 """
 
 import json

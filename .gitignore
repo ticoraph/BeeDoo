@@ -229,11 +229,14 @@ data/
 
 # Configuration locale de la machine et de l'assistant
 agents.local.md
+
+# Documentation de travail et instructions de l'assistant : locales, non publiées
+/docs/
+CLAUDE.md
 .claude/settings.local.json
 .claude/*.local.*
 
 # Photos et sons (un visage ou une voix sont des données personnelles).
-# Pour une image de documentation, la placer dans docs/.
 /*.jpg
 /*.jpeg
 /*.png
@@ -245,4 +248,3 @@ agents.local.md
 
 # Sorties des scripts
 beedoo_picture.jpg
-beedoo_state.json

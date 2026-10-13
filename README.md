@@ -2,7 +2,7 @@
 
 BeeDoo est un robot d'accompagnement basé sur un [Reachy Mini](https://github.com/pollen-robotics/reachy_mini) (Pollen Robotics). Il parle français comme un enfant de 7 ans, reconnaît les visages et dit bonjour par le prénom, propose une quinzaine de mini-applications (blague Toto, météo, actualités…) et apprend à connaître les personnes au fil des conversations.
 
-> **État du projet : en construction.** Le cadrage est fait, l'application n'existe pas encore. Voir [docs/PROJECT.md](docs/PROJECT.md) pour la vision et [docs/PLAN.md](docs/PLAN.md) pour l'avancement.
+> **État du projet : en construction.** Le cadrage est fait, l'application se construit phase par phase.
 
 ## Ce qu'il faut
 
@@ -58,13 +58,12 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 - Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné.
 - Les clés API sont dans `.env`, qui n'est jamais versionné.
 - La reconnaissance de visage tourne en local. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI. Informe les personnes concernées et respecte leur choix.
-- Si tu contribues : lis les règles de la section « Dépôt public » de [CLAUDE.md](CLAUDE.md). Ne pousse jamais de photo, d'enregistrement ou de vraie conversation.
+- Si tu contribues : ne pousse jamais de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne ni de chemin personnel. Les exemples et les tests n'utilisent que des personnes fictives. Les garde-fous `pre-commit` vérifient une partie de ces règles.
 
 ## Organisation du dépôt
 
 | Dossier | Contenu |
 |---|---|
-| `docs/` | Vision, plan, décisions |
 | `prompts/` | Personnalité de BeeDoo (prompt du LLM) |
 | `src/beedoo/` | Code de l'application (gestes, vision, voix, LLM, mémoire, mini-apps, interface) |
 | `tests/` | Tests |

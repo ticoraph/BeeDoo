@@ -7,7 +7,7 @@ DeepFace est volumineux (TensorFlow) : on l'installe à part, pas dans les dépe
 
 Avec une seule photo : détecte les visages, calcule l'empreinte, mesure le temps.
 Avec deux photos : indique aussi la distance entre le premier visage de chacune.
-N'utilise que des photos locales. Ne les committe jamais (voir CLAUDE.md).
+N'utilise que des photos locales. Ne les committe jamais (voir la section Vie privée du README).
 """
 
 import argparse
