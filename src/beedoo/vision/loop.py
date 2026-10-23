@@ -6,6 +6,7 @@ Les images restent en mémoire, ne sont jamais enregistrées ni envoyées. Une e
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 
 from beedoo.vision.greeter import Event, Greeter
@@ -28,6 +29,19 @@ class VisionLoop:
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="beedoo-vision", daemon=True)
         self._erreurs = 0
+        self._lecture = {"statut": "inactif", "taille": None, "personne": None, "depuis": time.monotonic()}
+
+    def status(self) -> dict:
+        """Ce que la vision voit en ce moment (pour l'interface). `age` : secondes depuis la dernière analyse."""
+        lecture = dict(self._lecture)
+        lecture["age"] = round(time.monotonic() - lecture.pop("depuis"), 1)
+        return lecture
+
+    def _noter(self, statut: str, taille: int | None = None, personne: str | None = None) -> None:
+        if statut != self._lecture["statut"]:
+            # Pas de nom dans les logs : seulement l'état et la taille du visage.
+            log.info("vision : %s%s", statut, f" ({taille} px)" if taille else "")
+        self._lecture = {"statut": statut, "taille": taille, "personne": personne, "depuis": time.monotonic()}
 
     def start(self) -> None:
         self._thread.start()
@@ -40,18 +54,27 @@ class VisionLoop:
         """Une analyse d'image. Renvoie l'événement déclenché, s'il y en a un."""
         frame = self._get_frame()
         if frame is None:
+            self._noter("pas_d_image")
             return None
         match = self._identify(frame)
-        if match.reason == "ambigu":  # entre deux personnes connues : ni inconnu, ni reconnu
-            return None
         if match.reason == "aucun_visage":
+            self._noter("aucun_visage")
             return self._greeter.observe(False)
+        if match.reason == "trop_petit":  # visage vu mais trop loin : ni reconnu, ni absent
+            self._noter("trop_petit", match.taille)
+            return None
+        if match.reason == "ambigu":  # entre deux personnes connues : ni inconnu, ni reconnu
+            self._noter("ambigu", match.taille)
+            return None
+        self._noter("reconnu" if match.person else "inconnu", match.taille, match.person)
         return self._greeter.observe(True, match.person)
 
     def _run(self) -> None:
         while not self._stop.is_set():
             attente = self._period
-            if self._active():
+            if not self._active():
+                self._noter("pause")
+            else:
                 try:
                     event = self.step()
                     self._erreurs = 0
@@ -64,5 +87,6 @@ class VisionLoop:
                         log.warning("analyse de l'image impossible (%d de suite, %s)", self._erreurs,
                                     type(erreur).__name__)
                     log.debug("détail de l'erreur d'analyse", exc_info=True)
+                    self._noter("erreur")
                     attente = self._period * RALENTI
             self._stop.wait(attente)

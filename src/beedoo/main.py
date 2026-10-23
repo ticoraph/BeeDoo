@@ -46,6 +46,7 @@ class Beedoo(ReachyMiniApp):
                           enrolement=Enrollment(get_frame, recognizer))
         vision = VisionLoop(get_frame, recognizer.identify, runtime.greeter, Salutation(runtime).on_event,
                             active=lambda: not runtime.enrolement.en_cours)
+        runtime.vision = vision
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 

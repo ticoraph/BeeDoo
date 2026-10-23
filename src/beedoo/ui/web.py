@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from beedoo.gestures.library import GESTES
 from beedoo.runtime import Runtime
 from beedoo.ui.page import PAGE
-from beedoo.vision.faces import person_id
+from beedoo.vision.faces import MIN_FACE_PIXELS, person_id
 
 log = logging.getLogger(__name__)
 
@@ -97,6 +97,17 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
         if runtime.faces is None or pid not in runtime.faces.people():
             raise HTTPException(status_code=404, detail="personne inconnue")
         return pid
+
+    @app.get("/api/vision")
+    def vision() -> dict:
+        """Ce que BeeDoo voit : de quoi dire à la personne quoi faire (approche-toi, ajoute-toi…)."""
+        if runtime.vision is None:
+            return {"statut": "indisponible", "min_taille": MIN_FACE_PIXELS}
+        lecture = runtime.vision.status()
+        pid = lecture.pop("personne")
+        if pid is not None and runtime.faces is not None:
+            lecture["nom"] = runtime.faces.display_name(pid)
+        return {**lecture, "min_taille": MIN_FACE_PIXELS}
 
     @app.get("/api/personnes")
     def personnes() -> dict:

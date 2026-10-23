@@ -36,6 +36,10 @@ PAGE = """<!doctype html>
     <div class="ligne"><span>État</span><strong id="etat">…</strong></div>
     <div class="ligne"><span>Muet</span><strong id="muet">…</strong></div>
   </section>
+  <section class="carte" aria-live="polite">
+    <h2>Ce que BeeDoo voit</h2>
+    <p id="vision">…</p>
+  </section>
   <section class="carte">
     <h2>Gestes</h2>
     <div id="gestes" class="boutons"></div>
@@ -91,6 +95,34 @@ PAGE = """<!doctype html>
       $("erreur").textContent = "Le changement n'a pas marché.";
     }
   });
+
+  function phraseVision(v) {
+    const min = v.min_taille;
+    if (v.statut !== "pause" && v.statut !== "indisponible" && v.age > 15) {
+      return "La caméra ne répond plus (dernière image il y a " + Math.round(v.age) + " s).";
+    }
+    switch (v.statut) {
+      case "reconnu": return "Je te reconnais : " + (v.nom || "") + ".";
+      case "inconnu": return "Je vois un visage, mais je ne le connais pas. Ajoute-toi dans « Personnes » ci-dessous.";
+      case "trop_petit": return "Je te vois, mais tu es trop loin. Approche-toi (ton visage fait " + v.taille + " px, il en faut au moins " + min + ").";
+      case "aucun_visage": return "Je ne vois personne. Mets-toi face à moi, le visage bien éclairé.";
+      case "ambigu": return "Je vois un visage mais j'hésite entre deux personnes. Approche-toi un peu.";
+      case "pause": return "Je regarde pour l'ajout d'une personne (voir plus bas).";
+      case "pas_d_image": return "Je ne reçois pas d'image de la caméra.";
+      case "erreur": return "Je n'arrive pas à analyser l'image (voir le terminal).";
+      case "inactif": return "Je me réveille…";
+      default: return "La vision n'est pas disponible.";
+    }
+  }
+
+  async function chargerVision() {
+    try {
+      const r = await fetch("/api/vision");
+      $("vision").textContent = phraseVision(await r.json());
+    } catch (e) {
+      $("vision").textContent = "BeeDoo ne répond plus.";
+    }
+  }
 
   async function chargerGestes() {
     try {
@@ -182,11 +214,14 @@ PAGE = """<!doctype html>
       const enCours = e && e.etat === "en_cours";
       $("ajouter").disabled = !d.camera || enCours;
       if (enCours) {
-        $("personnes-info").textContent = "Regarde BeeDoo et tourne doucement la tête… " + e.fait + "/" + e.total;
+        let conseil = "Regarde BeeDoo et tourne doucement la tête.";
+        if (e.derniere === "aucun_visage") conseil = "Je ne te vois pas : mets-toi face à moi.";
+        if (e.derniere === "trop_petit") conseil = "Tu es trop loin : approche-toi (visage " + e.taille + " px, il en faut " + e.min_taille + ").";
+        $("personnes-info").textContent = conseil + " Images valides : " + e.ajoutes + "/" + e.total + ".";
       } else if (e && e.etat === "termine") {
-        $("personnes-info").textContent = "C'est fait : " + e.ajoutes + " empreintes enregistrées.";
+        $("personnes-info").textContent = "C'est fait : " + e.ajoutes + " images enregistrées. Éloigne-toi un instant, puis reviens : je te saluerai.";
       } else if (e && e.etat === "echec") {
-        $("personnes-info").textContent = "Aucun visage trouvé. Approche-toi et réessaie.";
+        $("personnes-info").textContent = "Pas assez d'images valides (" + e.ajoutes + "). Approche-toi, éclaire ton visage et réessaie.";
       } else if (!d.camera) {
         $("personnes-info").textContent = "Caméra non connectée.";
       }
@@ -207,10 +242,12 @@ PAGE = """<!doctype html>
   });
 
   chargerGestes();
+  chargerVision();
   chargerPersonnes();
   rafraichir();
   setInterval(rafraichir, 2000);
   setInterval(chargerPersonnes, 2000);
+  setInterval(chargerVision, 1000);
 </script>
 </body>
 </html>

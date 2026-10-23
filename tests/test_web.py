@@ -126,7 +126,8 @@ class FauxEnrolement:
         return self.occupe
 
     def status(self):
-        return {"etat": "libre", "fait": 0, "total": 6, "ajoutes": 0}
+        return {"etat": "libre", "ajoutes": 0, "total": 6, "essais": 0, "derniere": None, "taille": None,
+                "min_taille": 60}
 
     def start(self, nom):
         if self.occupe:
@@ -204,3 +205,17 @@ def test_foreign_origin_cannot_delete(monde_visages):
     runtime, client = monde_visages
     reponse = client.delete("/api/personnes/lea", headers={**LOCAL, "Origin": "http://exemple.org"})
     assert reponse.status_code == 403 and runtime.faces.people() == ["lea"]
+
+
+def test_vision_endpoint_without_and_with_loop(monde_visages):
+    runtime, client = monde_visages
+    assert client.get("/api/vision", headers=LOCAL).json()["statut"] == "indisponible"
+
+    class FausseVision:
+        def status(self):
+            return {"statut": "reconnu", "taille": 74, "personne": "lea", "age": 0.4}
+
+    runtime.vision = FausseVision()
+    corps = client.get("/api/vision", headers=LOCAL).json()
+    assert corps["statut"] == "reconnu" and corps["nom"] == "Léa" and "personne" not in corps
+    assert corps["min_taille"] >= 1

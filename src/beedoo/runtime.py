@@ -11,6 +11,7 @@ from beedoo.state import State, StateMachine
 from beedoo.vision.enrollment import Enrollment
 from beedoo.vision.faces import FaceStore
 from beedoo.vision.greeter import Greeter
+from beedoo.vision.loop import VisionLoop
 from beedoo.voice.speaker import Speaker
 
 log = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class Runtime:
     faces: FaceStore | None = None
     greeter: Greeter | None = None
     enrolement: Enrollment | None = None  # None sans caméra
+    vision: VisionLoop | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def set_muet(self, muet: bool) -> None:

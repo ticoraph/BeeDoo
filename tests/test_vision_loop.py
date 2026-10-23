@@ -65,3 +65,42 @@ def test_paused_loop_does_not_analyse():
     time.sleep(0.1)
     loop.stop()
     assert vus == []
+
+
+def test_status_tells_what_is_seen():
+    loop, _ = boucle([Match(None, None, None, "trop_petit", 50), Match(None, None, None, "aucun_visage"),
+                      Match(None, 0.9, None, "trop_loin", 120), Match("lea", 0.1, 0.5, "", 140)])
+    loop.step()
+    assert loop.status()["statut"] == "trop_petit" and loop.status()["taille"] == 50
+    loop.step()
+    assert loop.status()["statut"] == "aucun_visage"
+    loop.step()
+    assert loop.status()["statut"] == "inconnu"
+    loop.step()
+    état = loop.status()
+    assert état["statut"] == "reconnu" and état["personne"] == "lea" and état["age"] < 1
+
+
+def test_too_small_face_never_triggers_events_nor_resets():
+    loop, _ = boucle([lea(), Match(None, None, None, "trop_petit", 40), lea()])
+    loop.step()
+    loop.step()
+    assert loop.step() == Event(SALUE, "lea")
+
+
+def test_status_says_pause_and_error():
+    loop, _ = boucle([], period=0.01, active=lambda: False)
+    loop.start()
+    time.sleep(0.1)
+    loop.stop()
+    assert loop.status()["statut"] == "pause"
+
+    def casse(frame):
+        raise RuntimeError("x")
+
+    en_erreur = VisionLoop(get_frame=lambda: object(), identify=casse, greeter=Greeter(), on_event=print,
+                           period=0.01)
+    en_erreur.start()
+    time.sleep(0.1)
+    en_erreur.stop()
+    assert en_erreur.status()["statut"] == "erreur"

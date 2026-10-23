@@ -86,3 +86,23 @@ def test_rename_moves_person_and_refuses_duplicates(tmp_path):
         store.rename("absent", "Zoé")
     assert store.rename("paul", "PAUL") == "paul"  # même identifiant : seul l'affichage change
     assert store.display_name("paul") == "PAUL"
+
+
+def test_recognizer_reports_small_face_without_enrolling(tmp_path, monkeypatch):
+    from beedoo.vision import faces
+    from beedoo.vision.faces import FaceRecognizer, Visage
+
+    store = FaceStore(tmp_path)
+    reco = FaceRecognizer(store, min_face_pixels=60)
+    monkeypatch.setattr(faces, "detect_face", lambda *a, **k: Visage(unit(1, 0, 0), 40))
+    assert reco.enroll_image("Léa", object()).statut == "trop_petit"
+    assert store.people() == []
+    assert reco.identify(object()).reason == "trop_petit"
+    monkeypatch.setattr(faces, "detect_face", lambda *a, **k: Visage(unit(1, 0, 0), 74))
+    lecture = reco.enroll_image("Léa", object())
+    assert lecture.statut == "ok" and lecture.taille == 74 and store.people() == ["lea"]
+    match = reco.identify(object())
+    assert match.person == "lea" and match.taille == 74
+    monkeypatch.setattr(faces, "detect_face", lambda *a, **k: None)
+    assert reco.identify(object()).reason == "aucun_visage"
+    assert reco.enroll_image("Léa", object()).statut == "aucun_visage"

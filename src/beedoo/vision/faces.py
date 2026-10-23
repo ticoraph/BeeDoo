@@ -28,7 +28,8 @@ DEFAULT_DETECTOR = "retinaface"
 # Distance cosinus en dessous de laquelle deux empreintes sont « la même personne » (provisoire).
 THRESHOLDS = {"ArcFace": 0.68, "Facenet": 0.40, "Facenet512": 0.30}
 MIN_MARGIN = 0.05       # écart minimal avec la deuxième personne la plus proche
-MIN_FACE_PIXELS = 90    # plus petit côté de la boîte du visage ; en dessous on ignore (trop loin, parasite)
+MIN_FACE_PIXELS = 60    # plus petit côté de la boîte du visage ; en dessous : « trop loin » (mesuré : reconnaissance
+                        # excellente à 74 px sur une image 1920x1080, distance 0,02)
 
 
 def cosine_distance(a, b) -> float:
@@ -50,7 +51,16 @@ class Match:
     person: str | None       # None = personne inconnue
     distance: float | None   # distance à la personne la plus proche (None si galerie vide)
     margin: float | None     # écart avec la deuxième personne la plus proche (None si une seule)
-    reason: str = ""         # "", "trop_loin", "ambigu", "aucune_personne"
+    reason: str = ""         # "", "trop_loin", "ambigu", "aucune_personne", "aucun_visage", "trop_petit"
+    taille: int | None = None  # plus petit côté du visage vu, en pixels (None si aucun visage)
+
+
+@dataclass(frozen=True)
+class Lecture:
+    """Ce que la caméra a donné pour un enrôlement."""
+
+    statut: str              # "ok", "aucun_visage" ou "trop_petit"
+    taille: int | None = None
 
 
 def best_match(embedding, gallery: dict[str, list[list[float]]], threshold: float,
@@ -142,13 +152,15 @@ class FaceStore:
             shutil.rmtree(folder)
 
 
-def extract_embedding(image, model: str = DEFAULT_MODEL, detector: str = DEFAULT_DETECTOR,
-                      min_face_pixels: int = MIN_FACE_PIXELS) -> list[float] | None:
-    """Empreinte du plus grand visage de l'image (chemin ou tableau BGR), ou None.
+@dataclass(frozen=True)
+class Visage:
+    embedding: list[float]
+    taille: int  # plus petit côté de la boîte, en pixels
 
-    Ignore les visages trop petits (parasites, personnes au loin).
-    """
-    from deepface import DeepFace  # import tardif : dépendance optionnelle et lourde
+
+def detect_face(image, model: str = DEFAULT_MODEL, detector: str = DEFAULT_DETECTOR) -> Visage | None:
+    """Le plus grand visage de l'image (chemin ou tableau BGR) avec son empreinte, ou None s'il n'y en a pas."""
+    from deepface import DeepFace  # import tardif : dépendance lourde
 
     faces = [f for f in DeepFace.represent(image, model_name=model, detector_backend=detector,
                                            enforce_detection=False) if f["face_confidence"] > 0]
@@ -156,28 +168,44 @@ def extract_embedding(image, model: str = DEFAULT_MODEL, detector: str = DEFAULT
         return None
     biggest = max(faces, key=lambda f: f["facial_area"]["w"] * f["facial_area"]["h"])
     area = biggest["facial_area"]
-    if min(area["w"], area["h"]) < min_face_pixels:
-        return None
-    return list(biggest["embedding"])
+    return Visage(list(biggest["embedding"]), min(area["w"], area["h"]))
+
+
+def extract_embedding(image, model: str = DEFAULT_MODEL, detector: str = DEFAULT_DETECTOR,
+                      min_face_pixels: int = MIN_FACE_PIXELS) -> list[float] | None:
+    """Empreinte du plus grand visage de l'image, ou None (aucun visage, ou trop petit)."""
+    face = detect_face(image, model, detector)
+    return face.embedding if face is not None and face.taille >= min_face_pixels else None
 
 
 class FaceRecognizer:
     def __init__(self, store: FaceStore, detector: str = DEFAULT_DETECTOR, threshold: float | None = None,
-                 min_margin: float = MIN_MARGIN):
+                 min_margin: float = MIN_MARGIN, min_face_pixels: int = MIN_FACE_PIXELS):
         self.store = store
         self.detector = detector
         self.threshold = threshold if threshold is not None else THRESHOLDS[store.model]
         self.min_margin = min_margin
+        self.min_face_pixels = min_face_pixels
+
+    def enroll_image(self, person: str, image) -> Lecture:
+        """Enregistre l'empreinte du visage de l'image s'il est assez grand, et dit ce qui s'est passé."""
+        face = detect_face(image, self.store.model, self.detector)
+        if face is None:
+            return Lecture("aucun_visage")
+        if face.taille < self.min_face_pixels:
+            return Lecture("trop_petit", face.taille)
+        self.store.add(person, [face.embedding])
+        return Lecture("ok", face.taille)
 
     def enroll(self, person: str, images) -> int:
         """Enregistre une empreinte par image où un visage assez grand est trouvé. Retourne le nombre ajouté."""
-        found = [e for e in (extract_embedding(i, self.store.model, self.detector) for i in images) if e]
-        if found:
-            self.store.add(person, found)
-        return len(found)
+        return sum(self.enroll_image(person, i).statut == "ok" for i in images)
 
     def identify(self, image) -> Match:
-        embedding = extract_embedding(image, self.store.model, self.detector)
-        if embedding is None:
+        face = detect_face(image, self.store.model, self.detector)
+        if face is None:
             return Match(None, None, None, "aucun_visage")
-        return best_match(embedding, self.store.gallery(), self.threshold, self.min_margin)
+        if face.taille < self.min_face_pixels:
+            return Match(None, None, None, "trop_petit", face.taille)
+        match = best_match(face.embedding, self.store.gallery(), self.threshold, self.min_margin)
+        return Match(match.person, match.distance, match.margin, match.reason, face.taille)

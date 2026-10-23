@@ -1,42 +1,64 @@
+import threading
+
 from beedoo.vision.enrollment import Enrollment
+from beedoo.vision.faces import Lecture
 
 
 class FauxReconnaisseur:
-    def __init__(self, ajouts):
-        self.ajouts = list(ajouts)
+    def __init__(self, lectures):
+        self.lectures = list(lectures)
         self.noms = []
 
-    def enroll(self, nom, images):
+    def enroll_image(self, nom, image):
         self.noms.append(nom)
-        return self.ajouts.pop(0)
+        return self.lectures.pop(0)
 
 
-def lancer(ajouts, frames=None):
-    reco = FauxReconnaisseur(ajouts)
-    suite = iter(frames if frames is not None else [object()] * len(ajouts))
-    enrolement = Enrollment(get_frame=lambda: next(suite), recognizer=reco, total=len(ajouts), interval=0,
+OK = Lecture("ok", 120)
+LOIN = Lecture("trop_petit", 50)
+PERSONNE = Lecture("aucun_visage")
+
+
+def lancer(lectures, total=3, frames=None):
+    reco = FauxReconnaisseur(lectures)
+    suite = iter(frames if frames is not None else [object()] * len(lectures))
+    enrolement = Enrollment(get_frame=lambda: next(suite), recognizer=reco, total=total, interval=0,
                             sleep=lambda s: None)
     assert enrolement.start("Léa")
     enrolement.join()
     return enrolement, reco
 
 
-def test_success_counts_embeddings():
-    enrolement, reco = lancer([1, 1, 0, 1])
-    assert enrolement.status() == {"etat": "termine", "fait": 4, "total": 4, "ajoutes": 3}
-    assert reco.noms == ["Léa"] * 4
+def test_success_stops_once_enough_valid_images():
+    enrolement, reco = lancer([OK, OK, OK, OK], total=3)
+    statut = enrolement.status()
+    assert statut["etat"] == "termine" and statut["ajoutes"] == 3 and statut["essais"] == 3
+    assert reco.noms == ["Léa"] * 3
     assert not enrolement.en_cours
 
 
-def test_failure_when_no_face_found():
-    enrolement, _ = lancer([0, 0, 0])
+def test_invalid_images_do_not_count_but_allow_more_tries():
+    enrolement, _ = lancer([LOIN, PERSONNE, OK, OK, LOIN, OK], total=3)
+    statut = enrolement.status()
+    assert statut["etat"] == "termine" and statut["ajoutes"] == 3 and statut["essais"] == 6
+
+
+def test_failure_tells_why():
+    enrolement, _ = lancer([LOIN] * 6, total=3)
+    statut = enrolement.status()
+    assert statut["etat"] == "echec" and statut["ajoutes"] == 0
+    assert statut["derniere"] == "trop_petit" and statut["taille"] == 50
+    assert statut["min_taille"] > 50
+
+
+def test_two_valid_images_are_not_enough():
+    enrolement, _ = lancer([OK, OK] + [PERSONNE] * 4, total=3)
     assert enrolement.status()["etat"] == "echec"
 
 
 def test_missing_frames_are_skipped():
-    enrolement, reco = lancer([1, 1], frames=[None, object()])
-    assert enrolement.status()["ajoutes"] == 1
-    assert len(reco.noms) == 1
+    enrolement, reco = lancer([OK], total=1, frames=[None, object()])
+    assert enrolement.status()["ajoutes"] == 1 and len(reco.noms) == 1
 
 
 def test_camera_error_does_not_crash():
@@ -47,12 +69,11 @@ def test_camera_error_does_not_crash():
                             sleep=lambda s: None)
     enrolement.start("Léa")
     enrolement.join()
-    assert enrolement.status()["etat"] == "echec" and enrolement.status()["fait"] == 2
+    statut = enrolement.status()
+    assert statut["etat"] == "echec" and statut["derniere"] == "erreur" and statut["essais"] == 4
 
 
 def test_second_start_refused_while_running():
-    import threading
-
     porte = threading.Event()
     enrolement = Enrollment(get_frame=lambda: None, recognizer=FauxReconnaisseur([]), total=1, interval=0,
                             sleep=lambda s: porte.wait(2))
