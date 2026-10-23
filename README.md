@@ -67,6 +67,19 @@ Dans ce cas, installe la version du daemon, puis relance `pytest` :
 pip install "reachy-mini==1.11.0"
 ```
 
+## Interface web
+
+Quand BeeDoo tourne, une page locale affiche son état et un bouton pour couper l'écoute (muet) :
+
+```
+http://127.0.0.1:8765
+```
+
+- Elle n'écoute que sur ta machine (`127.0.0.1`), jamais sur le réseau, et ne charge rien depuis Internet.
+- Le port se change avec `BEEDOO_WEB_PORT` dans `.env`. Si le port est déjà pris, BeeDoo démarre quand même, sans la page.
+- Elle n'affiche et ne demande aucune clé API : elles restent dans `.env`.
+- Le réglage « muet » est enregistré dans `data/settings.json` (ignoré par git).
+
 ## Vie privée
 
 BeeDoo manipule des données sensibles : visages, voix, conversations.

@@ -13,6 +13,8 @@ dependencies = [
     "reachy-mini",
     "python-dotenv",
     "numpy",
+    "fastapi",
+    "uvicorn",
 ]
 keywords = ["reachy-mini-app"]
 

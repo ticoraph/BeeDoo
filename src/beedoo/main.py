@@ -13,26 +13,36 @@ from reachy_mini.utils import create_head_pose
 from beedoo.config import Config
 from beedoo.logs import setup_logging
 from beedoo.settings import Settings
-from beedoo.state import StateMachine
+from beedoo.runtime import Runtime
+from beedoo.ui.web import WebServer
 
 log = logging.getLogger(__name__)
 
 
 class Beedoo(ReachyMiniApp):
-    # Pas d'interface web pour l'instant (Gradio, prévu en phase 2).
+    # L'interface web est lancée dans run() (ui/web.py) : on n'utilise pas le serveur du SDK.
     custom_app_url: str | None = None
 
     def run(self, reachy_mini: ReachyMini, stop_event: threading.Event) -> None:
         setup_logging()
         config = Config.load()
         settings = Settings.load(config.data_dir)
-        machine = StateMachine()
+        runtime = Runtime(config=config, settings=settings)
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 
+        web = WebServer(runtime, config.web_port)
+        try:
+            web.start()
+        except OSError:
+            log.warning("interface web indisponible (port %d occupé ?)", config.web_port)
+
         reachy_mini.goto_target(create_head_pose(), antennas=[0.0, 0.0], duration=1.0)
-        stop_event.wait()
-        log.info("BeeDoo s'arrête (état : %s)", machine.state.value)
+        try:
+            stop_event.wait()
+        finally:
+            web.stop()
+            log.info("BeeDoo s'arrête (état : %s)", runtime.machine.state.value)
 
 
 if __name__ == "__main__":
