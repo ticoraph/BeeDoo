@@ -5,15 +5,23 @@ transcrite, envoyée au LLM, et la réponse est dite à voix haute -> quand plus
 pendant `ABSENCE` secondes, la conversation se termine : micro coupé, historique oublié.
 Sans personne connue en vue, ou en mode muet, le micro n'est pas lu du tout.
 
-Aucun contenu (phrase entendue, réponse) dans les logs : seulement des durées.
+Mémoire (phase 8) : seulement pour les personnes qui ont donné leur consentement. Les souvenirs d'UNE
+personne ne servent qu'à elle : si la personne reconnue change, ou si seul un inconnu est vu depuis plus
+de `RECONNU_RECEMMENT` secondes, l'historique est remis à zéro. À la fin de la conversation (ou à
+l'arrêt), la conversation est enregistrée et les faits retenus sont mis à jour, en arrière-plan.
+
+Aucun contenu (phrase entendue, réponse, fait) dans les logs : seulement des durées et des comptes.
 """
 
 import logging
 import threading
 import time
 from collections.abc import Callable
+from datetime import datetime
 
 from beedoo.llm.chat import NE_SAIT_PAS, LLMError
+from beedoo.memory import extraction
+from beedoo.memory.store import RIEN
 from beedoo.miniapps.base import Contexte, Reponse
 from beedoo.runtime import Runtime
 from beedoo.state import State
@@ -26,12 +34,15 @@ ABSENCE = 30.0        # secondes sans voir de visage avant de finir la conversat
 FRAICHEUR = 6.0       # âge maximal (s) d'une analyse de la caméra pour la croire encore valable
 VISAGE_VU = {"reconnu", "inconnu", "ambigu", "trop_petit"}  # états où un visage est devant le robot
 LECTURE = 0.05        # durée (s) maximale d'une lecture du micro
+RECONNU_RECEMMENT = 10.0  # s : au-delà, on ne sait plus à qui on parle, donc on n'utilise aucun souvenir
+ATTENTE_ARRET = 20.0  # s : temps laissé à l'enregistrement de la conversation quand l'application s'arrête
 PAUSE_PARTIES = 0.8   # secondes entre deux parties d'une réponse (mise en place, puis chute d'une blague)
 
 
 class Conversation:
     def __init__(self, runtime: Runtime, media, transcribe: Callable, chat,
-                 clock: Callable[[], float] = time.monotonic, routeur=None) -> None:
+                 clock: Callable[[], float] = time.monotonic, routeur=None,
+                 maintenant: Callable[[], datetime] = datetime.now) -> None:
         self._runtime = runtime
         self._media = media
         self._transcribe = transcribe  # (audio, samplerate) -> texte
@@ -42,6 +53,12 @@ class Conversation:
         self._enregistre = False
         self._dernier_vu = float("-inf")
         self._personne: str | None = None
+        self._reconnu_a = float("-inf")   # dernière fois où une personne connue a été reconnue
+        self._maintenant = maintenant
+        self._pid_conv: str | None = None  # personne à qui l'on parle dans la conversation en cours
+        self._tours: list[tuple[str, str]] = []  # (ce qu'elle a dit, ce que BeeDoo a répondu), si elle a consenti
+        self._debut_conv = maintenant()
+        self._consolidations: list[threading.Thread] = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="beedoo-conversation", daemon=True)
 
@@ -51,8 +68,12 @@ class Conversation:
 
     def stop(self) -> None:
         self._stop.set()
-        self._thread.join(timeout=10)
+        if self._thread.is_alive():
+            self._thread.join(timeout=10)
         self._couper_micro()
+        self._clore_conversation()
+        for fil in self._consolidations:  # laisse finir l'enregistrement de ce qui vient d'être dit
+            fil.join(timeout=ATTENTE_ARRET)
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -103,14 +124,63 @@ class Conversation:
             self._dernier_vu = self._clock()
         if lecture["statut"] == "reconnu":
             self._personne = lecture["personne"]
+            self._reconnu_a = self._clock()
             return True
         return False
 
-    def _prenom(self) -> str:
+    def _pid_courant(self) -> str | None:
+        """La personne à qui BeeDoo parle, si on l'a reconnue il y a peu ; sinon personne (aucun souvenir utilisé)."""
+        if self._personne and self._clock() - self._reconnu_a <= RECONNU_RECEMMENT:
+            return self._personne
+        return None
+
+    def _prenom(self, pid: str | None = None) -> str:
         faces = self._runtime.faces
-        if self._personne and faces is not None:
-            return faces.display_name(self._personne)
+        if pid and faces is not None:
+            return faces.display_name(pid)
         return "inconnu"
+
+    # --- mémoire ------------------------------------------------------------------------------
+    def _memoire(self):
+        return self._runtime.memoire
+
+    def _a_consenti(self, pid: str | None) -> bool:
+        memoire = self._memoire()
+        return bool(pid and memoire is not None and memoire.consentement(pid))
+
+    def _changer_de_personne(self, pid: str | None) -> None:
+        """Quand la personne change, on enregistre ce qui précède et on repart d'une page blanche."""
+        if pid == self._pid_conv:
+            return
+        self._clore_conversation()
+        self._chat.reset()
+        if self._routeur is not None:
+            self._routeur.reset()
+        self._pid_conv = pid
+
+    def _clore_conversation(self) -> None:
+        """Enregistre la conversation de `_pid_conv` et met à jour ses faits, en arrière-plan."""
+        pid, tours, debut = self._pid_conv, self._tours, self._debut_conv
+        self._tours = []
+        self._debut_conv = self._maintenant()
+        if not pid or not tours or self._memoire() is None:
+            return
+        fil = threading.Thread(target=self._consolider, args=(pid, tours, debut), name="beedoo-memoire", daemon=True)
+        self._consolidations = [f for f in self._consolidations if f.is_alive()] + [fil]
+        fil.start()
+
+    def _consolider(self, pid: str, tours: list[tuple[str, str]], debut: datetime) -> None:
+        runtime, memoire = self._runtime, self._runtime.memoire
+        try:
+            nom = runtime.faces.display_name(pid) if runtime.faces is not None else pid
+            memoire.enregistrer_conversation(pid, nom, tours, debut)  # sans effet si le consentement a été retiré
+            if memoire.consentement(pid):
+                extraction.mettre_a_jour(runtime.config, memoire, pid, tours)
+        except (LLMError, OSError, ValueError) as erreur:
+            log.warning("mémoire : conversation non consolidée (%s)", type(erreur).__name__)
+        except Exception as erreur:
+            log.warning("mémoire : erreur inattendue (%s)", type(erreur).__name__)
+            log.debug("détail", exc_info=True)
 
     # --- micro --------------------------------------------------------------------------------
     def _demarrer(self) -> None:
@@ -130,6 +200,8 @@ class Conversation:
 
     def _terminer(self) -> None:
         self._couper_micro()
+        self._clore_conversation()
+        self._pid_conv = None
         self._chat.reset()
         if self._routeur is not None:
             self._routeur.reset()
@@ -170,11 +242,11 @@ class Conversation:
         except ValueError:
             log.debug("transition ignorée vers %s", etat.value)
 
-    def _miniapp(self, texte: str) -> Reponse | None:
+    def _miniapp(self, texte: str, pid: str | None) -> Reponse | None:
         """Réponse d'une mini-application si la phrase en déclenche une ; elle est ajoutée à l'historique du LLM."""
         if self._routeur is None:
             return None
-        reponse = self._routeur.router(texte, Contexte(settings=self._runtime.settings, prenom=self._prenom()))
+        reponse = self._routeur.router(texte, Contexte(settings=self._runtime.settings, prenom=self._prenom(pid)))
         if reponse is not None:
             self._chat.memoriser(texte, " ".join(reponse.parties))
         return reponse
@@ -206,10 +278,14 @@ class Conversation:
             return
         transcription = time.monotonic() - debut
         runtime.echange = {"entendu": texte, "dit": ""}
-        reponse = self._miniapp(texte)
+        pid = self._pid_courant()
+        self._changer_de_personne(pid)
+        memoire = self._memoire()
+        souvenirs = memoire.souvenirs(pid) if memoire is not None else RIEN
+        reponse = self._miniapp(texte, pid)
         if reponse is None:
             try:
-                reponse = Reponse((self._chat.reply(texte, self._prenom()),))
+                reponse = Reponse((self._chat.reply(texte, self._prenom(pid), souvenirs),))
             except LLMError as erreur:
                 log.warning("conversation : le LLM n'a pas répondu (%s)", erreur)
                 reponse = Reponse((NE_SAIT_PAS,))
@@ -217,6 +293,8 @@ class Conversation:
         dit = " ".join(reponse.parties)
         runtime.echange = {"entendu": texte, "dit": dit}
         self._aller(State.PAROLE)
+        if self._a_consenti(pid):
+            self._tours.append((texte, dit))
         self._dire(reponse)
         log.info("conversation : phrase de %.1f s, transcription %.1f s, réponse %.1f s",
                  phrase.duration, transcription, reflexion)

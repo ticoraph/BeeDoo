@@ -129,10 +129,11 @@ class FauxEnrolement:
         return {"etat": "libre", "ajoutes": 0, "total": 6, "essais": 0, "derniere": None, "taille": None,
                 "min_taille": 60}
 
-    def start(self, nom):
+    def start(self, nom, apres=None):
         if self.occupe:
             return False
         self.demandes.append(nom)
+        self.apres = apres
         return True
 
 
@@ -151,7 +152,8 @@ def monde_visages(runtime):
 def test_people_listed_without_embeddings_content(monde_visages):
     _, client = monde_visages
     corps = client.get("/api/personnes", headers=LOCAL)
-    assert corps.json()["personnes"] == [{"id": "lea", "nom": "Léa", "empreintes": 1}]
+    assert corps.json()["personnes"] == [{"id": "lea", "nom": "Léa", "empreintes": 1, "memoire": False,
+                                          "faits": 0, "conversations": 0}]
     assert "1.0" not in corps.text  # les empreintes elles-mêmes ne sortent jamais
 
 
@@ -322,3 +324,96 @@ def test_miniapps_listed_and_toggled(runtime):
     assert client.post("/api/miniapps/toto", json={"active": True}, headers=LOCAL).status_code == 200
     assert Settings.load(runtime.config.data_dir).miniapps_desactivees == []
     assert client.post("/api/miniapps/inconnue", json={"active": True}, headers=LOCAL).status_code == 404
+
+
+# --- mémoire ---
+@pytest.fixture
+def monde_memoire(monde_visages):
+    from beedoo.memory.store import MemoryStore
+
+    runtime, client = monde_visages
+    runtime.memoire = MemoryStore(runtime.config.data_dir)
+    return runtime, client
+
+
+def test_memory_is_off_by_default_and_consent_toggles(monde_memoire):
+    runtime, client = monde_memoire
+    assert client.get("/api/personnes", headers=LOCAL).json()["personnes"][0]["memoire"] is False
+    assert client.put("/api/personnes/lea/memoire", json={"accepte": True}, headers=LOCAL).status_code == 200
+    assert runtime.memoire.consentement("lea")
+    assert client.get("/api/personnes", headers=LOCAL).json()["personnes"][0]["memoire"] is True
+    client.put("/api/personnes/lea/memoire", json={"accepte": False}, headers=LOCAL)
+    assert not runtime.memoire.consentement("lea")
+    assert client.put("/api/personnes/absente/memoire", json={"accepte": True}, headers=LOCAL).status_code == 404
+
+
+def test_consent_given_at_enrollment_is_applied_only_on_success(monde_memoire):
+    runtime, client = monde_memoire
+    client.post("/api/personnes", json={"prenom": "Paul", "memoire": True}, headers=LOCAL)
+    assert not runtime.memoire.consentement("paul")  # pas encore : l'enrôlement n'est pas fini
+    runtime.enrolement.apres("Paul")  # ... et le voilà fini
+    assert runtime.memoire.consentement("paul")
+    client.post("/api/personnes", json={"prenom": "Zoé"}, headers=LOCAL)
+    assert runtime.enrolement.apres is None  # sans la case, aucun consentement n'est enregistré
+
+
+def test_read_edit_and_erase_memories(monde_memoire):
+    runtime, client = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    reponse = client.put("/api/personnes/lea/souvenirs", json={"faits": ["Elle aime les chats.", "", "Sa fille s'appelle Anna."]},
+                         headers=LOCAL)
+    assert reponse.json()["faits"] == ["Elle aime les chats.", "Sa fille s'appelle Anna."]
+    lu = client.get("/api/personnes/lea/souvenirs", headers=LOCAL).json()
+    assert lu == {"memoire": True, "faits": ["Elle aime les chats.", "Sa fille s'appelle Anna."], "conversations": 0}
+    assert client.get("/api/personnes", headers=LOCAL).json()["personnes"][0]["faits"] == 2
+    assert client.delete("/api/personnes/lea/souvenirs", headers=LOCAL).status_code == 200
+    assert client.get("/api/personnes/lea/souvenirs", headers=LOCAL).json()["faits"] == []
+    assert runtime.faces.people() == ["lea"]  # le visage est toujours connu
+
+
+@pytest.mark.parametrize("faits", [["Son code secret est 12345678"], ["ab"], ["x" * 200], ["Mail : a@b.fr"]])
+def test_manual_edit_refuses_secrets_and_bad_lengths(monde_memoire, faits):
+    runtime, client = monde_memoire
+    assert client.put("/api/personnes/lea/souvenirs", json={"faits": faits}, headers=LOCAL).status_code == 422
+    assert runtime.memoire.faits("lea") == []
+
+
+def test_too_many_memories_refused(monde_memoire):
+    _, client = monde_memoire
+    faits = [f"Fait numéro {i}." for i in range(40)]
+    assert client.put("/api/personnes/lea/souvenirs", json={"faits": faits}, headers=LOCAL).status_code == 422
+
+
+def test_memory_routes_reject_foreign_origin_and_unknown_people(monde_memoire):
+    runtime, client = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    runtime.memoire.ecrire_faits("lea", ["Elle aime les chats."])
+    etranger = {**LOCAL, "Origin": "http://exemple.org"}
+    assert client.delete("/api/personnes/lea/souvenirs", headers=etranger).status_code == 403
+    assert client.get("/api/personnes/lea/souvenirs", headers={"Host": "exemple.org"}).status_code == 403
+    assert runtime.memoire.faits("lea") == ["Elle aime les chats."]
+    assert client.get("/api/personnes/absente/souvenirs", headers=LOCAL).status_code == 404
+    assert client.get("/api/personnes/..%2Fx/souvenirs", headers=LOCAL).status_code == 404
+
+
+def test_deleting_a_person_removes_memories_and_conversations(monde_memoire):
+    from datetime import datetime
+
+    runtime, client = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    runtime.memoire.ecrire_faits("lea", ["Elle aime les chats."])
+    runtime.memoire.enregistrer_conversation("lea", "Léa", [("a b c d", "ok")], datetime(2026, 10, 23, 10, 0))
+    assert client.delete("/api/personnes/lea", headers=LOCAL).status_code == 200
+    assert not (runtime.config.data_dir / "personnes" / "lea").exists()  # rien ne reste, ni visage ni souvenirs
+
+
+def test_memory_unavailable_without_store(monde_visages):
+    _, client = monde_visages
+    assert client.get("/api/personnes/lea/souvenirs", headers=LOCAL).status_code == 503
+
+
+def test_page_script_keeps_backslash_n_escaped():
+    from beedoo.ui.page import PAGE
+
+    # Dans la page, \n doit rester deux caractères (antislash + n) : un vrai retour à la ligne casserait le JavaScript.
+    assert 'join("\\n")' in PAGE and 'split("\\n")' in PAGE

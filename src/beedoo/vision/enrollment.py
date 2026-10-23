@@ -40,12 +40,15 @@ class Enrollment:
     def status(self) -> dict:
         return dict(self._etat)
 
-    def start(self, name: str) -> bool:
-        """Lance l'enrôlement en arrière-plan. False si un autre est déjà en cours."""
+    def start(self, name: str, apres: Callable[[str], None] | None = None) -> bool:
+        """Lance l'enrôlement en arrière-plan. False si un autre est déjà en cours.
+
+        `apres(name)` est appelé seulement si l'enrôlement réussit (par exemple pour enregistrer un consentement).
+        """
         if not self._verrou.acquire(blocking=False):
             return False
         self._etat = self._neuf("en_cours")
-        self._thread = threading.Thread(target=self._run, args=(name,), name="beedoo-enrolement", daemon=True)
+        self._thread = threading.Thread(target=self._run, args=(name, apres), name="beedoo-enrolement", daemon=True)
         self._thread.start()
         return True
 
@@ -53,7 +56,7 @@ class Enrollment:
         if self._thread is not None:
             self._thread.join(timeout)
 
-    def _run(self, name: str) -> None:
+    def _run(self, name: str, apres: Callable[[str], None] | None) -> None:
         try:
             while self._etat["ajoutes"] < self._total and self._etat["essais"] < self._max_essais:
                 self._sleep(self._interval)
@@ -70,7 +73,13 @@ class Enrollment:
                 self._etat["derniere"], self._etat["taille"] = statut, taille
                 if statut == "ok":
                     self._etat["ajoutes"] += 1
-            self._etat["etat"] = "termine" if self._etat["ajoutes"] >= 3 else "echec"
+            reussi = self._etat["ajoutes"] >= 3
+            if reussi and apres is not None:
+                try:
+                    apres(name)
+                except Exception as erreur:
+                    log.warning("enrôlement : étape finale impossible (%s)", type(erreur).__name__)
+            self._etat["etat"] = "termine" if reussi else "echec"
             log.info("enrôlement fini : %d empreintes en %d essais", self._etat["ajoutes"], self._etat["essais"])
         finally:
             self._verrou.release()

@@ -8,8 +8,6 @@ Une mini-application est une classe `MiniApp` avec :
 On l'ajoute ensuite à la liste `TOUTES` de `beedoo/miniapps/__init__.py`. Rien d'autre à brancher.
 """
 
-import re
-import unicodedata
 from datetime import datetime
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -17,12 +15,7 @@ from dataclasses import dataclass, field
 
 from beedoo.miniapps.http import get_json
 from beedoo.settings import Settings
-
-
-def normaliser(texte: str) -> str:
-    """Minuscules, sans accents ni ponctuation, espaces simples : « Quel TEMPS, demain ? » -> « quel temps demain »."""
-    sans_accents = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", sans_accents.lower()).split())
+from beedoo.texte import normaliser  # noqa: F401  (réexporté : les mini-applications l'importent d'ici)
 
 
 def contient(texte_normalise: str, mots: tuple[str, ...]) -> bool:

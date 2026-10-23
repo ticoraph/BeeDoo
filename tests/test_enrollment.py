@@ -81,3 +81,30 @@ def test_second_start_refused_while_running():
     assert not enrolement.start("Paul")
     porte.set()
     enrolement.join()
+
+
+def test_after_callback_runs_only_on_success():
+    appeles = []
+    enrolement, _ = lancer([OK, OK, OK], total=3)
+    enrolement.start("Léa", apres=appeles.append)
+    enrolement.join()
+    assert appeles == []  # plus d'images : l'enrôlement a échoué
+    reco = FauxReconnaisseur([OK, OK, OK])
+    suite = iter([object()] * 3)
+    reussi = Enrollment(get_frame=lambda: next(suite), recognizer=reco, total=3, interval=0, sleep=lambda s: None)
+    reussi.start("Léa", apres=appeles.append)
+    reussi.join()
+    assert appeles == ["Léa"] and reussi.status()["etat"] == "termine"
+
+
+def test_failing_after_callback_does_not_fail_the_enrollment():
+    def casse(nom):
+        raise OSError("disque plein")
+
+    reco = FauxReconnaisseur([OK, OK, OK])
+    suite = iter([object()] * 3)
+    enrolement = Enrollment(get_frame=lambda: next(suite), recognizer=reco, total=3, interval=0,
+                            sleep=lambda s: None)
+    enrolement.start("Léa", apres=casse)
+    enrolement.join()
+    assert enrolement.status()["etat"] == "termine"

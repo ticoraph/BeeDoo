@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from beedoo.gestures.library import GESTES
+from beedoo.memory.store import MAX_FAITS
 from beedoo import robot_volume
 from beedoo.runtime import Runtime
 from beedoo.settings import VOIX
@@ -51,6 +52,19 @@ class MiniAppRequest(BaseModel):
 
 class PrenomRequest(BaseModel):
     prenom: str
+
+
+class AjoutRequest(BaseModel):
+    prenom: str
+    memoire: bool = False  # la personne accepte que BeeDoo se souvienne de ce qu'elle dit
+
+
+class ConsentementRequest(BaseModel):
+    accepte: bool
+
+
+class FaitsRequest(BaseModel):
+    faits: list[str] = Field(max_length=MAX_FAITS)
 
 
 def prenom_valide(valeur: str) -> str:
@@ -174,19 +188,26 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
     @app.get("/api/personnes")
     def personnes() -> dict:
         faces = runtime.faces
+        memoire = runtime.memoire
         liste = [] if faces is None else [
-            {"id": pid, "nom": faces.display_name(pid), "empreintes": len(faces.embeddings(pid))}
+            {"id": pid, "nom": faces.display_name(pid), "empreintes": len(faces.embeddings(pid)),
+             "memoire": memoire is not None and memoire.consentement(pid),
+             "faits": 0 if memoire is None else len(memoire.faits(pid)),
+             "conversations": 0 if memoire is None else len(memoire.conversations(pid))}
             for pid in faces.people()]
         enrolement = runtime.enrolement
         return {"personnes": liste, "camera": enrolement is not None,
                 "enrolement": None if enrolement is None else enrolement.status()}
 
     @app.post("/api/personnes", status_code=202)
-    def ajouter(requete: PrenomRequest) -> dict:
+    def ajouter(requete: AjoutRequest) -> dict:
         prenom = prenom_valide(requete.prenom)
         if runtime.enrolement is None:
             raise HTTPException(status_code=503, detail="caméra indisponible")
-        if not runtime.enrolement.start(prenom):
+        memoire = runtime.memoire
+        # Le consentement n'est enregistré que si l'enrôlement réussit (pas de dossier orphelin).
+        apres = (lambda nom: memoire.set_consentement(nom, True)) if requete.memoire and memoire is not None else None
+        if not runtime.enrolement.start(prenom, apres):
             raise HTTPException(status_code=409, detail="un enrôlement est déjà en cours")
         return {"ok": True}
 
@@ -199,6 +220,37 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
             raise HTTPException(status_code=409, detail="ce prénom existe déjà") from None
         if runtime.greeter is not None:
             runtime.greeter.forget(pid)
+        return {"ok": True}
+
+    def magasin():
+        if runtime.memoire is None:
+            raise HTTPException(status_code=503, detail="mémoire indisponible")
+        return runtime.memoire
+
+    @app.put("/api/personnes/{pid}/memoire")
+    def consentement(pid: str, requete: ConsentementRequest) -> dict:
+        magasin().set_consentement(personne(pid), requete.accepte)
+        return {"memoire": requete.accepte}
+
+    @app.get("/api/personnes/{pid}/souvenirs")
+    def souvenirs(pid: str) -> dict:
+        memoire = magasin()
+        pid = personne(pid)
+        return {"memoire": memoire.consentement(pid), "faits": memoire.faits(pid),
+                "conversations": len(memoire.conversations(pid))}
+
+    @app.put("/api/personnes/{pid}/souvenirs")
+    def corriger_souvenirs(pid: str, requete: FaitsRequest) -> dict:
+        try:
+            ecrits = magasin().ecrire_faits(personne(pid), [f for f in requete.faits if f.strip()])
+        except ValueError:
+            raise HTTPException(status_code=422, detail="un souvenir est refusé (trop court, trop long, ou secret)") from None
+        return {"faits": ecrits}
+
+    @app.delete("/api/personnes/{pid}/souvenirs")
+    def effacer_souvenirs(pid: str) -> dict:
+        magasin().effacer(personne(pid))
+        log.info("les souvenirs d'une personne ont été effacés")
         return {"ok": True}
 
     @app.delete("/api/personnes/{pid}")

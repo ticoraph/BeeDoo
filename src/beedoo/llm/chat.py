@@ -52,6 +52,25 @@ def pour_etre_lu(texte: str) -> str:
     return " ".join(texte.split())
 
 
+def completer(config: Config, messages: list[dict], json_seul: bool = False, timeout: float = 60.0) -> str:
+    """Réponse brute du LLM à une liste de messages (point d'appel unique). Lève LLMError en cas d'échec."""
+    if not config.openai_api_key:
+        raise LLMError("clé OpenAI absente")
+    body = {"model": config.openai_model, "reasoning_effort": "low", "messages": messages}
+    if json_seul:
+        body["response_format"] = {"type": "json_object"}
+    request = urllib.request.Request(
+        URL, data=json.dumps(body).encode(),
+        headers={"Authorization": f"Bearer {config.openai_api_key}", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout, context=SSL_CONTEXT) as response:
+            return json.load(response)["choices"][0]["message"]["content"] or ""
+    except urllib.error.HTTPError as error:
+        raise LLMError(f"OpenAI a répondu {error.code}") from None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, IndexError) as error:
+        raise LLMError(f"réponse impossible ({type(error).__name__})") from None
+
+
 class Chat:
     def __init__(self, config: Config, modele_prompt: str | None = None) -> None:
         self._config = config
@@ -74,18 +93,7 @@ class Chat:
         systeme = system_prompt(prenom, souvenirs, maintenant or datetime.now(), self._modele)
         messages = [{"role": "system", "content": systeme}, *self._historique,
                     {"role": "user", "content": texte}]
-        body = {"model": self._config.openai_model, "reasoning_effort": "low", "messages": messages}
-        request = urllib.request.Request(
-            URL, data=json.dumps(body).encode(),
-            headers={"Authorization": f"Bearer {self._config.openai_api_key}",
-                     "Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(request, timeout=60, context=SSL_CONTEXT) as response:
-                reponse = pour_etre_lu(json.load(response)["choices"][0]["message"]["content"] or "")
-        except urllib.error.HTTPError as error:
-            raise LLMError(f"OpenAI a répondu {error.code}") from None
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, IndexError) as error:
-            raise LLMError(f"réponse impossible ({type(error).__name__})") from None
+        reponse = pour_etre_lu(completer(self._config, messages))
         if not reponse:
             raise LLMError("réponse vide")
         self.memoriser(texte, reponse)

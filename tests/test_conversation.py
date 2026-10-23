@@ -11,6 +11,7 @@ from beedoo.config import Config  # noqa: E402
 from beedoo.llm.chat import LLMError, NE_SAIT_PAS  # noqa: E402
 from beedoo.runtime import Runtime  # noqa: E402
 from beedoo.settings import Settings  # noqa: E402
+from beedoo.memory.store import MemoryStore  # noqa: E402
 from beedoo.state import State  # noqa: E402
 from beedoo.vision.faces import FaceStore  # noqa: E402
 from beedoo.voice.stt import STTError  # noqa: E402
@@ -72,10 +73,11 @@ class FauxChat:
         self.erreur = None
         self.resets = 0
 
-    def reply(self, texte, prenom="inconnu"):
+    def reply(self, texte, prenom="inconnu", souvenirs="rien pour l'instant"):
         if self.erreur:
             raise self.erreur
         self.questions.append((texte, prenom))
+        self.souvenirs = getattr(self, "souvenirs", []) + [souvenirs]
         return "Salut, ça va bien !"
 
     def reset(self):
@@ -98,6 +100,7 @@ def monde(tmp_path: Path, monkeypatch):
     runtime = Runtime(config=Config.load(env_file=tmp_path / "absent.env"), settings=Settings())
     runtime.faces = FaceStore(tmp_path)
     runtime.faces.add("Léa", [[1.0, 0.0]])
+    runtime.memoire = MemoryStore(tmp_path)
     runtime.vision = FausseVision()
     runtime.speaker = FausseVoix(runtime)
     micro, chat, horloge = FauxMicro(), FauxChat(), Horloge()
@@ -322,3 +325,135 @@ def test_proposal_is_forgotten_when_the_conversation_ends(monde_apps):
     c._clock.t += conv.ABSENCE + 1
     c.tick()
     assert c._routeur._en_attente is None
+
+
+# --- mémoire (phase 8) ---
+from datetime import datetime  # noqa: E402
+
+
+@pytest.fixture
+def monde_memoire(monde, monkeypatch):
+    runtime, micro, chat, horloge, entendu, c = monde
+    appels = []
+    monkeypatch.setattr(conv.extraction, "mettre_a_jour",
+                        lambda config, memoire, pid, tours: appels.append((pid, list(tours))))
+    c._maintenant = lambda: datetime(2026, 10, 23, 15, 30)
+    c._debut_conv = c._maintenant()
+    return runtime, micro, chat, horloge, entendu, c, appels
+
+
+def finir(c):
+    c._terminer()
+    for fil in c._consolidations:
+        fil.join(5)
+
+
+def test_without_consent_nothing_is_remembered_nor_used(monde_memoire, tmp_path):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.ecrire_faits("lea", ["Sa fille s'appelle Anna."])  # présent sur le disque, mais pas de consentement
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert chat.souvenirs == ["rien pour l'instant"]
+    finir(c)
+    assert appels == [] and runtime.memoire.conversations("lea") == []
+
+
+def test_with_consent_memories_reach_the_llm_and_conversation_is_saved(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    runtime.memoire.ecrire_faits("lea", ["Sa fille s'appelle Anna."])
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert chat.souvenirs == ["- Sa fille s'appelle Anna."]
+    finir(c)
+    assert runtime.memoire.conversations("lea") == ["2026-10-23_1530"]
+    texte = (runtime.memoire.root / "lea" / "conversations" / "2026-10-23_1530.md").read_text()
+    assert "**Léa** : Bonjour BeeDoo, ça va ?" in texte and "**BeeDoo** : Salut, ça va bien !" in texte
+    assert appels == [("lea", [("Bonjour BeeDoo, ça va ?", "Salut, ça va bien !")])]
+
+
+def test_conversation_is_consolidated_once_only(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    finir(c)
+    finir(c)
+    assert len(appels) == 1 and len(runtime.memoire.conversations("lea")) == 1
+
+
+def test_stop_saves_the_running_conversation(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    c.stop()  # l'application s'arrête en pleine conversation
+    assert len(appels) == 1 and runtime.memoire.conversations("lea") == ["2026-10-23_1530"]
+
+
+def test_unknown_visitor_gets_no_memories_and_leaves_no_trace(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    runtime.memoire.ecrire_faits("lea", ["Sa fille s'appelle Anna."])
+    c.tick()
+    runtime.vision.lecture["statut"] = "inconnu"  # Léa est partie, un visiteur parle
+    horloge.t += conv.RECONNU_RECEMMENT + 1
+    dire_une_phrase(c, micro)
+    assert chat.souvenirs == ["rien pour l'instant"] and chat.questions[0][1] == "inconnu"
+    finir(c)
+    assert appels == [] and runtime.memoire.conversations("lea") == []
+
+
+def test_other_person_never_hears_what_the_first_one_said(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.faces.add("Paul", [[0.0, 1.0]])
+    for pid in ("lea", "paul"):
+        runtime.memoire.set_consentement(pid, True)
+    runtime.memoire.ecrire_faits("lea", ["Sa fille s'appelle Anna."])
+    runtime.memoire.ecrire_faits("paul", ["Il aime la pêche."])
+    c.tick()
+    dire_une_phrase(c, micro)  # Léa parle
+    runtime.vision.lecture.update(personne="paul")  # Paul prend sa place
+    horloge.t += 1
+    dire_une_phrase(c, micro)
+    assert chat.souvenirs == ["- Sa fille s'appelle Anna.", "- Il aime la pêche."]
+    assert chat.resets >= 1  # l'historique de Léa a été oublié avant de parler à Paul
+    assert chat.questions[1][1] == "Paul"
+    finir(c)
+    assert sorted(pid for pid, _ in appels) == ["lea", "paul"]
+    assert all(len(t) == 1 for _, t in appels)  # chacun n'a que ses propres paroles
+
+
+def test_consent_withdrawn_before_consolidation_saves_nothing(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    runtime.memoire.set_consentement("lea", False)
+    finir(c)
+    assert appels == [] and runtime.memoire.conversations("lea") == []
+
+
+def test_person_erased_during_conversation_is_not_resurrected(monde_memoire, tmp_path):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    runtime.faces.forget("lea")  # effacée depuis la page
+    finir(c)
+    assert appels == [] and not (tmp_path / "personnes" / "lea").exists()
+
+
+def test_memory_failure_never_breaks_the_conversation(monde_memoire, monkeypatch):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+
+    def casse(*a, **k):
+        raise conv.LLMError("OpenAI a répondu 500")
+
+    monkeypatch.setattr(conv.extraction, "mettre_a_jour", casse)
+    c.tick()
+    dire_une_phrase(c, micro)
+    finir(c)
+    assert runtime.machine.state == State.VEILLE
+    assert runtime.memoire.conversations("lea") == ["2026-10-23_1530"]  # la conversation est quand même gardée

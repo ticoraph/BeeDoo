@@ -20,7 +20,7 @@ PAGE = """<!doctype html>
   .boutons { display: flex; flex-wrap: wrap; gap: 8px; }
   button:disabled { opacity: 0.5; cursor: default; }
   ul { list-style: none; margin: 0 0 12px; padding: 0; }
-  li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--bord); }
+  li { flex-wrap: wrap; display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--bord); }
   li span { flex: 1; }
   input { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); min-width: 0; flex: 1; }
   label { display: block; margin-bottom: 4px; }
@@ -85,6 +85,8 @@ PAGE = """<!doctype html>
         <input id="prenom" maxlength="40" placeholder="Prénom" required>
         <button id="ajouter" type="submit">Ajouter</button>
       </div>
+      <div class="reglage"><input id="consent-ajout" type="checkbox">
+        <label for="consent-ajout" style="flex:1">Cette personne accepte que BeeDoo se souvienne de ce qu'elle dit</label></div>
     </form>
     <p id="personnes-info" aria-live="polite"></p>
   </section>
@@ -265,6 +267,62 @@ PAGE = """<!doctype html>
     }
   }
 
+  function volets(p) {
+    const d = document.createElement("details");
+    d.style.flexBasis = "100%";
+    const resume = document.createElement("summary");
+    resume.textContent = p.memoire
+      ? "Souvenirs : " + p.faits + " retenus, " + p.conversations + " conversation(s) gardée(s)"
+      : "Souvenirs : désactivés";
+    const accord = document.createElement("input");
+    accord.type = "checkbox"; accord.checked = p.memoire; accord.id = "memoire-" + p.id;
+    const etiquette = document.createElement("label");
+    etiquette.htmlFor = accord.id; etiquette.style.display = "inline";
+    etiquette.textContent = " Accepte que BeeDoo se souvienne de ce qu'elle dit";
+    const zone = document.createElement("textarea");
+    zone.rows = 6; zone.style.width = "100%"; zone.maxLength = 4200;
+    zone.setAttribute("aria-label", "Souvenirs, un par ligne");
+    const info = document.createElement("p");
+    info.className = "note";
+    const enregistrer = document.createElement("button");
+    enregistrer.type = "button"; enregistrer.className = "petit"; enregistrer.textContent = "Enregistrer les souvenirs";
+    const vider = document.createElement("button");
+    vider.type = "button"; vider.className = "petit"; vider.textContent = "Effacer les souvenirs";
+    const url = "/api/personnes/" + encodeURIComponent(p.id);
+
+    d.addEventListener("toggle", async () => {
+      if (!d.open) return;
+      try { zone.value = (await (await fetch(url + "/souvenirs")).json()).faits.join("\\n"); }
+      catch (e) { info.textContent = "Souvenirs indisponibles."; }
+    });
+    accord.addEventListener("change", async () => {
+      try { await envoyer("PUT", url + "/memoire", { accepte: accord.checked }); info.textContent = accord.checked ? "Enregistré : BeeDoo se souviendra." : "BeeDoo ne retient plus rien de cette personne."; }
+      catch (e) { info.textContent = e.message; }
+    });
+    enregistrer.addEventListener("click", async () => {
+      try {
+        await envoyer("PUT", url + "/souvenirs", { faits: zone.value.split("\\n") });
+        info.textContent = "Souvenirs enregistrés.";
+      } catch (e) { info.textContent = e.message; }
+    });
+    let arme = false;
+    vider.addEventListener("click", async () => {
+      if (!arme) {
+        arme = true; vider.textContent = "Sûr ? Tout effacer";
+        setTimeout(() => { arme = false; vider.textContent = "Effacer les souvenirs"; }, 4000);
+        return;
+      }
+      try { await envoyer("DELETE", url + "/souvenirs"); zone.value = ""; info.textContent = "Souvenirs effacés (visage conservé)."; }
+      catch (e) { info.textContent = e.message; }
+      arme = false; vider.textContent = "Effacer les souvenirs";
+    });
+    const aide = document.createElement("p");
+    aide.className = "note";
+    aide.textContent = "Un souvenir par ligne. Sans cette case cochée, BeeDoo ne retient rien et n'utilise aucun souvenir.";
+    d.append(resume, aide, accord, etiquette, zone, enregistrer, vider, info);
+    return d;
+  }
+
   function ligne(p) {
     const li = document.createElement("li");
     const nom = document.createElement("span");
@@ -295,7 +353,7 @@ PAGE = """<!doctype html>
       catch (e) { $("personnes-info").textContent = e.message; }
       chargerPersonnes();
     });
-    li.append(nom, renommer, effacer);
+    li.append(nom, renommer, effacer, volets(p));
     return li;
   }
 
@@ -304,12 +362,15 @@ PAGE = """<!doctype html>
       const r = await fetch("/api/personnes");
       const d = await r.json();
       const liste = $("personnes");
-      liste.textContent = "";
-      for (const p of d.personnes) liste.appendChild(ligne(p));
-      if (!d.personnes.length) {
-        const vide = document.createElement("li");
-        vide.textContent = "Personne pour l'instant.";
-        liste.appendChild(vide);
+      const enEdition = liste.querySelector("details[open]") || liste.contains(document.activeElement);
+      if (!enEdition) {  // on ne reconstruit pas la liste sous les doigts de quelqu'un qui modifie un souvenir
+        liste.textContent = "";
+        for (const p of d.personnes) liste.appendChild(ligne(p));
+        if (!d.personnes.length) {
+          const vide = document.createElement("li");
+          vide.textContent = "Personne pour l'instant.";
+          liste.appendChild(vide);
+        }
       }
       const e = d.enrolement;
       const enCours = e && e.etat === "en_cours";
@@ -334,7 +395,7 @@ PAGE = """<!doctype html>
   $("ajout").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     try {
-      await envoyer("POST", "/api/personnes", { prenom: $("prenom").value });
+      await envoyer("POST", "/api/personnes", { prenom: $("prenom").value, memoire: $("consent-ajout").checked });
       $("prenom").value = "";
     } catch (e) {
       $("personnes-info").textContent = e.message;

@@ -15,6 +15,7 @@ from beedoo.config import Config
 from beedoo.conversation import Conversation
 from beedoo.gestures.player import GesturePlayer
 from beedoo.llm.chat import Chat
+from beedoo.memory.store import MemoryStore
 from beedoo.miniapps import toutes
 from beedoo.miniapps.routeur import Routeur
 from beedoo.logs import setup_logging
@@ -49,7 +50,7 @@ class Beedoo(ReachyMiniApp):
 
         suivi = HeadTracker(reachy_mini, settings.suivi)
         runtime = Runtime(config=config, settings=settings, gestes=GesturePlayer(reachy_mini, suivi),
-                          suivi=suivi, miniapps=toutes(),
+                          suivi=suivi, miniapps=toutes(), memoire=MemoryStore(config.data_dir),
                           speaker=Speaker(reachy_mini, config, settings), faces=faces, greeter=Greeter(),
                           enrolement=Enrollment(get_frame, recognizer))
         vision = VisionLoop(get_frame, recognizer.identify, runtime.greeter, Salutation(runtime).on_event,

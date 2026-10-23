@@ -96,6 +96,7 @@ http://127.0.0.1:8765
 - Elle liste les personnes connues : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne).
 - Réglages : volume du robot, vitesse et choix de la voix, interrupteur du suivi du visage (la tête suit la personne du regard).
 - Mini-applications : « une blague de Toto », « quel temps fait-il ? » (aujourd'hui ou demain). Pour la météo, écris le nom de ta ville dans les réglages : il est envoyé au service Open-Meteo (gratuit, sans clé). Chaque mini-application peut être désactivée.
+- Souvenirs : par défaut BeeDoo ne retient rien. Si tu coches « accepte que BeeDoo se souvienne » pour une personne, il enregistre ses conversations et en retient des faits (« sa fille s'appelle Anna »), que tu peux relire, corriger ou effacer dans la page. Effacer une personne supprime aussi tous ses souvenirs.
 - Le réglage « muet » coupe l'écoute et la parole. Il est enregistré dans `data/settings.json` (ignoré par git).
 
 ## Vie privée
@@ -104,7 +105,7 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 
 - Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné.
 - Les clés API sont dans `.env`, qui n'est jamais versionné.
-- La reconnaissance de visage tourne en local. Les images de la caméra ne sont jamais enregistrées ni envoyées : seules des empreintes numériques sont gardées dans `data/`. BeeDoo n'écoute que lorsqu'il voit une personne connue (et jamais en mode muet) : sans cela, le micro n'est pas lu. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI, ainsi que le texte des salutations, qui contient le prénom de la personne reconnue. La météo envoie le nom de ta ville à Open-Meteo. Informe les personnes concernées et respecte leur choix.
+- La reconnaissance de visage tourne en local. Les images de la caméra ne sont jamais enregistrées ni envoyées : seules des empreintes numériques sont gardées dans `data/`. BeeDoo n'écoute que lorsqu'il voit une personne connue (et jamais en mode muet) : sans cela, le micro n'est pas lu. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI, ainsi que le texte des salutations, qui contient le prénom de la personne reconnue. La météo envoie le nom de ta ville à Open-Meteo. Si la mémoire est activée pour une personne, ses conversations sont aussi envoyées à OpenAI à la fin pour en retenir des faits, et sont gardées en texte dans `data/personnes/` (jamais versionné). Informe les personnes concernées et respecte leur choix.
 - Si tu contribues : ne pousse jamais de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne ni de chemin personnel. Les exemples et les tests n'utilisent que des personnes fictives. Les garde-fous `pre-commit` vérifient une partie de ces règles.
 
 ## Organisation du dépôt

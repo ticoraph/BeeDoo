@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from beedoo.config import Config
 from beedoo.gestures.player import GesturePlayer
+from beedoo.memory.store import MemoryStore
 from beedoo.settings import Settings
 from beedoo.state import State, StateMachine
 from beedoo.tracking import HeadTracker
@@ -30,6 +31,7 @@ class Runtime:
     enrolement: Enrollment | None = None  # None sans caméra
     vision: VisionLoop | None = None
     suivi: HeadTracker | None = None
+    memoire: MemoryStore | None = None
     miniapps: list = field(default_factory=list)  # mini-applications disponibles (miniapps.toutes())
     echange: dict | None = None  # dernière phrase entendue et dite, en mémoire seulement
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
