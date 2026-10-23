@@ -433,3 +433,11 @@ def test_journal_endpoint(runtime):
     suite = client.get(f"/api/journal?depuis={corps['dernier']}", headers=LOCAL).json()
     assert suite["lignes"] == []
     assert client.get("/api/journal", headers={"Host": "exemple.org"}).status_code == 403
+
+
+def test_page_checkboxes_cannot_collapse_to_zero_width():
+    from beedoo.ui.page import PAGE
+
+    # « flex: 0 » seul donne une largeur de base de 0 et rend la case invisible (défaut vu sur une capture).
+    regle = [ligne for ligne in PAGE.splitlines() if ".reglage input[type=checkbox]" in ligne][0]
+    assert "flex: 0 0 auto" in regle and "flex: 0;" not in regle

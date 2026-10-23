@@ -7,8 +7,8 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BeeDoo</title>
 <style>
-  :root { color-scheme: light dark; --fond: #fff8e1; --texte: #2b2b2b; --carte: #ffffff; --accent: #f5a300; --bord: #e6d9b0; }
-  @media (prefers-color-scheme: dark) { :root { --fond: #1e1b12; --texte: #f1ead6; --carte: #2a2619; --bord: #4a4126; } }
+  :root { color-scheme: light dark; --fond: #fff8e1; --texte: #2b2b2b; --carte: #ffffff; --accent: #f5a300; --bord: #e6d9b0; --erreur: #b3261e; --avert: #8a5a00; }
+  @media (prefers-color-scheme: dark) { :root { --fond: #1e1b12; --texte: #f1ead6; --carte: #2a2619; --bord: #4a4126; --erreur: #ff8a80; --avert: #f0b64a; } }
   body { margin: 0; padding: 16px; background: var(--fond); color: var(--texte); font: 18px/1.5 system-ui, sans-serif; }
   main { max-width: 32rem; margin: 0 auto; }
   h1 { margin: 0 0 16px; }
@@ -29,18 +29,19 @@ PAGE = """<!doctype html>
   .reglage { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .reglage label { flex: 0 0 9rem; margin: 0; }
   .reglage input[type=range] { flex: 1; padding: 0; }
-  .reglage input[type=checkbox] { flex: 0; width: 1.2rem; height: 1.2rem; }
+  .reglage input[type=checkbox] { flex: 0 0 auto; width: 1.2rem; height: 1.2rem; padding: 0; }  /* « flex: 0 » seul le réduirait à rien */
   select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
-  #erreur { color: #b3261e; min-height: 1.5em; }
+  #erreur { color: var(--erreur); margin: 8px 0 0; }
+  #erreur:empty { display: none; }
   nav { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
   nav button { background: transparent; color: var(--texte); border-color: var(--bord); padding: 6px 14px; }
   nav button[aria-selected=true] { background: var(--accent); border-color: var(--accent); color: #2b2b2b; font-weight: 600; }
   [hidden] { display: none !important; }
-  .alerte { color: #b3261e; font-size: 0.9rem; margin: 8px 0 0; }
+  .alerte { color: var(--erreur); font-size: 0.9rem; margin: 8px 0 0; }
   .journal { max-height: 60vh; overflow-y: auto; font: 0.8rem/1.4 ui-monospace, monospace; }
   .journal div { padding: 2px 0; border-bottom: 1px solid var(--bord); word-break: break-word; }
-  .journal .WARNING { color: #9a6700; }
-  .journal .ERROR, .journal .CRITICAL { color: #b3261e; }
+  .journal .WARNING { color: var(--avert); }
+  .journal .ERROR, .journal .CRITICAL { color: var(--erreur); }
 </style>
 </head>
 <body>
@@ -372,7 +373,7 @@ PAGE = """<!doctype html>
   function ligne(p) {
     const li = document.createElement("li");
     const nom = document.createElement("span");
-    nom.textContent = p.nom + " (" + p.empreintes + " empreintes)";
+    nom.textContent = p.nom + " (" + p.empreintes + (p.empreintes > 1 ? " empreintes)" : " empreinte)");
     const renommer = document.createElement("button");
     renommer.type = "button"; renommer.className = "petit"; renommer.textContent = "Renommer";
     renommer.addEventListener("click", () => {
