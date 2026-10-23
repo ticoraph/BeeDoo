@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Faille de sécurité ou fuite de données
+    url: https://github.com/ticoraph/BeeDoo/blob/main/SECURITY.md
+    about: Ne publie pas de détails dans une issue publique. Lis d'abord SECURITY.md.

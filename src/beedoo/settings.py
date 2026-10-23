@@ -10,6 +10,8 @@ import os
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
+from beedoo.donnees import proteger_fichier
+
 log = logging.getLogger(__name__)
 
 SETTINGS_FILE = "settings.json"
@@ -60,4 +62,6 @@ class Settings:
         path = data_dir / SETTINGS_FILE
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(asdict(self.clamp()), indent=2) + "\n", encoding="utf-8")
+        os.chmod(tmp, 0o600)
         os.replace(tmp, path)
+        proteger_fichier(path, data_dir)

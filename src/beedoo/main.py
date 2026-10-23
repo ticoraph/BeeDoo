@@ -12,6 +12,7 @@ from reachy_mini import ReachyMini, ReachyMiniApp
 from reachy_mini.utils import create_head_pose
 
 from beedoo.config import Config
+from beedoo.donnees import proteger
 from beedoo.conversation import Conversation
 from beedoo.gestures.player import GesturePlayer
 from beedoo.llm.chat import Chat
@@ -41,6 +42,9 @@ class Beedoo(ReachyMiniApp):
     def run(self, reachy_mini: ReachyMini, stop_event: threading.Event) -> None:
         setup_logging()
         config = Config.load()
+        corriges = proteger(config.data_dir)  # visages, voix, souvenirs : l'utilisateur seul
+        if corriges:
+            log.info("data/ : droits resserrés sur %d élément(s)", corriges)
         settings = Settings.load(config.data_dir)
         faces = FaceStore(config.data_dir)
         recognizer = FaceRecognizer(faces)

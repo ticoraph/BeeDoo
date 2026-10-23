@@ -17,6 +17,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from beedoo.donnees import proteger_fichier
 from beedoo.vision.faces import person_id
 
 log = logging.getLogger(__name__)
@@ -40,13 +41,14 @@ def nettoyer_fait(texte: str) -> str | None:
     return fait
 
 
-def _ecrire(chemin: Path, contenu: str) -> None:
-    """Écriture atomique, lisible par l'utilisateur seul."""
+def _ecrire(chemin: Path, contenu: str, data_dir: Path) -> None:
+    """Écriture atomique ; le fichier et ses dossiers, jusqu'à data/, ne sont accessibles qu'à l'utilisateur."""
     chemin.parent.mkdir(parents=True, exist_ok=True)
     tmp = chemin.with_name(chemin.name + ".tmp")
     tmp.write_text(contenu, encoding="utf-8")
     os.chmod(tmp, 0o600)
     os.replace(tmp, chemin)
+    proteger_fichier(chemin, data_dir)
 
 
 class MemoryStore:
@@ -64,7 +66,7 @@ class MemoryStore:
             return False
 
     def set_consentement(self, personne: str, accepte: bool) -> None:
-        _ecrire(self._dossier(personne) / "memoire.json", json.dumps({"consentement": bool(accepte)}))
+        _ecrire(self._dossier(personne) / "memoire.json", json.dumps({"consentement": bool(accepte)}), self.root.parent)
 
     # --- faits --------------------------------------------------------------------------------
     def faits(self, personne: str) -> list[str]:
@@ -91,7 +93,7 @@ class MemoryStore:
         fichier = self._dossier(personne) / "profil.md"
         if fichier.exists():
             shutil.copy2(fichier, fichier.with_name("profil.md.bak"))
-        _ecrire(fichier, "".join(f"- {fait}\n" for fait in propres))
+        _ecrire(fichier, "".join(f"- {fait}\n" for fait in propres), self.root.parent)
         return propres
 
     def souvenirs(self, personne: str | None) -> str:
@@ -121,7 +123,7 @@ class MemoryStore:
         lignes = [f"# Conversation du {debut.strftime('%Y-%m-%d à %H:%M')}", ""]
         for dit, reponse in tours:
             lignes += [f"**{nom}** : {dit}", f"**BeeDoo** : {reponse}", ""]
-        _ecrire(chemin, "\n".join(lignes))
+        _ecrire(chemin, "\n".join(lignes), self.root.parent)
         return chemin
 
     def conversations(self, personne: str) -> list[str]:

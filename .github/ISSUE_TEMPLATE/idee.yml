@@ -1,0 +1,26 @@
+name: Idée
+description: Une mini-application, une amélioration, une question
+labels: ["idée"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        BeeDoo parle comme un enfant de 7 ans, en français, avec des phrases courtes. Garde ça en tête. Rien de personnel dans cette issue (voir `CONTRIBUTING.md`).
+  - type: textarea
+    id: idee
+    attributes:
+      label: Ton idée
+      description: Qu'est-ce que BeeDoo ferait ou dirait ? Pour qui, dans quelle situation ?
+    validations:
+      required: true
+  - type: textarea
+    id: donnees
+    attributes:
+      label: Données et services
+      description: Si l'idée demande un service sur Internet, lequel (gratuit, sans clé de préférence) et quelle donnée y partirait ?
+  - type: checkboxes
+    id: aide
+    attributes:
+      label: Participation
+      options:
+        - label: Je peux aider à l'écrire ou à la tester.

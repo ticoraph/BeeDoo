@@ -1,0 +1,49 @@
+name: Problème
+description: Quelque chose ne marche pas comme prévu
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Avant d'écrire : rien de personnel.** Pas de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne, de chemin de ta machine. Voir `CONTRIBUTING.md`.
+  - type: textarea
+    id: quoi
+    attributes:
+      label: Ce qui se passe
+      description: Qu'as-tu vu ? Qu'attendais-tu ?
+    validations:
+      required: true
+  - type: textarea
+    id: etapes
+    attributes:
+      label: Comment le reproduire
+      description: Les étapes, de préférence avec l'interface de démonstration (`python scripts/demo_interface.py`) ou la simulation.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Version du SDK `reachy-mini` ET du daemon (elles doivent être identiques), et commit de BeeDoo (`git rev-parse --short HEAD`).
+      placeholder: "SDK 1.11.0, daemon 1.11.0, commit abc1234"
+  - type: dropdown
+    id: materiel
+    attributes:
+      label: Matériel
+      options: ["Reachy Mini Lite (USB)", "Reachy Mini Wireless", "Simulation", "Aucun robot (interface de démonstration)"]
+  - type: input
+    id: systeme
+    attributes:
+      label: Système
+      placeholder: "macOS 15, Python 3.12"
+  - type: textarea
+    id: journal
+    attributes:
+      label: Journal (facultatif)
+      description: Copie le contenu de l'onglet **Journal** de l'interface (il est nettoyé des clés et des chemins personnels). Ne colle pas ton terminal en entier. Relis avant d'envoyer.
+      render: text
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Vérification
+      options:
+        - label: "J'ai relu ce que j'envoie : aucune clé, photo, enregistrement, conversation réelle, prénom de vraie personne ni chemin personnel."
+          required: true

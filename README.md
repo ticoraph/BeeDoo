@@ -140,10 +140,10 @@ Relance BeeDoo, puis ouvre `http://<adresse de l'ordinateur>:8765`. Le navigateu
 
 BeeDoo manipule des données sensibles : visages, voix, conversations.
 
-- Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné.
+- Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné. Ses dossiers et fichiers ne sont accessibles qu'à ton compte (droits 700 et 600), resserrés à chaque démarrage de BeeDoo.
 - Les clés API sont dans `.env`, qui n'est jamais versionné.
 - La reconnaissance de visage tourne en local. Les images de la caméra ne sont jamais enregistrées ni envoyées : seules des empreintes numériques sont gardées dans `data/`. BeeDoo n'écoute que lorsqu'il voit une personne connue (et jamais en mode muet) : sans cela, le micro n'est pas lu. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI, ainsi que le texte des salutations, qui contient le prénom de la personne reconnue. La météo envoie le nom de ta ville à Open-Meteo. Si la mémoire est activée pour une personne, ses conversations sont aussi envoyées à OpenAI à la fin pour en retenir des faits, et sont gardées en texte dans `data/personnes/` (jamais versionné). Informe les personnes concernées et respecte leur choix.
-- Si tu contribues : ne pousse jamais de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne ni de chemin personnel. Les exemples et les tests n'utilisent que des personnes fictives. Les garde-fous `pre-commit` vérifient une partie de ces règles.
+- Si tu contribues (merci !), lis [`CONTRIBUTING.md`](CONTRIBUTING.md). Pour signaler une faille ou une fuite de données : [`SECURITY.md`](SECURITY.md). Ne pousse jamais de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne ni de chemin personnel. Les exemples et les tests n'utilisent que des personnes fictives. Les garde-fous `pre-commit` vérifient une partie de ces règles.
 
 ## Organisation du dépôt
 

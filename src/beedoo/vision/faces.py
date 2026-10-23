@@ -23,6 +23,8 @@ from pathlib import Path
 
 import numpy as np
 
+from beedoo.donnees import proteger_fichier
+
 DEFAULT_MODEL = "ArcFace"
 DEFAULT_DETECTOR = "retinaface"
 # Distance cosinus en dessous de laquelle deux empreintes sont « la même personne » (provisoire).
@@ -118,7 +120,9 @@ class FaceStore:
         file.parent.mkdir(parents=True, exist_ok=True)
         tmp = file.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(data))
+        os.chmod(tmp, 0o600)
         os.replace(tmp, file)
+        proteger_fichier(file, self.root.parent)  # dossiers de la personne et de data/ en 700
 
     def display_name(self, person: str) -> str:
         """Prénom tel qu'il a été saisi (« Léa »), à défaut l'identifiant mis en majuscule initiale."""
