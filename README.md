@@ -49,6 +49,27 @@ Vérifier que tout est en place : `pytest`.
 
 **Reconnaissance de visage** : elle se fait sur ta machine avec DeepFace (installé par `requirements.txt`, avec OpenCV `headless`). N'installe pas `opencv-python` à côté : deux paquets OpenCV se cassent mutuellement. Au premier usage, les modèles (environ 100 Mo) sont téléchargés depuis GitHub dans `~/.deepface/` : il faut donc un accès à GitHub une fois.
 
+### Installer sur un autre Mac
+
+Même procédure sur chaque Mac : on clone le dépôt et on lance le script d'installation.
+
+```bash
+brew install python@3.12 git        # si Python 3.12 et git ne sont pas déjà là
+git clone --recurse-submodules https://github.com/ticoraph/BeeDoo.git
+cd BeeDoo
+scripts/install.sh
+```
+
+Le script crée le venv, installe les dépendances, crée `.env` et lance les tests. Il reste à faire à la main :
+
+1. Renseigner `OPENAI_API_KEY` dans `.env` (la clé n'est jamais dans git, il faut la saisir sur chaque Mac).
+2. Brancher le robot, puis lancer `scripts/lancer.command` (double-clic possible dans le Finder). Il démarre le daemon s'il ne tourne pas déjà, puis BeeDoo.
+3. Autoriser l'accès à la **caméra** et au **micro** quand macOS le demande pour le Terminal.
+4. Laisser DeepFace télécharger ses modèles au premier usage (accès à GitHub nécessaire).
+5. Si le Mac a l'application « Reachy Mini Control », sa version du daemon peut différer de celle du SDK que `pip` vient d'installer (la dernière). `lancer.command` compare les deux et propose d'aligner le SDK (voir « Version du SDK » plus bas).
+
+Les visages et les souvenirs vivent dans `data/`, qui n'est pas dans git : sur le nouveau Mac, **ajoute les personnes à nouveau** dans l'onglet « Personnes ». Si tu préfères copier `data/` toi-même, fais-le à la main (`scp`, clé USB), jamais par git, et sur tes propres machines seulement.
+
 ## Essayer le robot
 
 Dans un premier terminal, lancer le daemon du robot (ou `reachy-mini-daemon --sim` pour la simulation) :
