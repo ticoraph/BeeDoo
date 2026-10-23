@@ -10,6 +10,7 @@ On l'ajoute ensuite à la liste `TOUTES` de `beedoo/miniapps/__init__.py`. Rien 
 
 import re
 import unicodedata
+from datetime import datetime
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -43,6 +44,7 @@ class Contexte:
     settings: Settings
     prenom: str = "inconnu"
     http_json: Callable[[str], dict] = field(default=get_json)  # remplaçable dans les tests
+    maintenant: Callable[[], datetime] = field(default=datetime.now)  # idem : l'heure locale de la machine
 
 
 class MiniApp(ABC):

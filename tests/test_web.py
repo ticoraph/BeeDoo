@@ -315,9 +315,9 @@ def test_miniapps_listed_and_toggled(runtime):
     runtime.miniapps = toutes()
     client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
     liste = client.get("/api/miniapps", headers=LOCAL).json()["miniapps"]
-    assert [m["nom"] for m in liste] == ["toto", "meteo"] and all(m["active"] for m in liste)
+    assert [m["nom"] for m in liste] == ["toto", "meteo", "heure"] and all(m["active"] for m in liste)
     reponse = client.post("/api/miniapps/toto", json={"active": False}, headers=LOCAL)
-    assert [m["active"] for m in reponse.json()["miniapps"]] == [False, True]
+    assert [m["active"] for m in reponse.json()["miniapps"]] == [False, True, True]
     assert Settings.load(runtime.config.data_dir).miniapps_desactivees == ["toto"]
     assert client.post("/api/miniapps/toto", json={"active": True}, headers=LOCAL).status_code == 200
     assert Settings.load(runtime.config.data_dir).miniapps_desactivees == []

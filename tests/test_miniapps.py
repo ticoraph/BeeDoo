@@ -95,7 +95,7 @@ def test_a_broken_app_does_not_break_the_conversation():
 
 def test_real_registry():
     noms = [app.nom for app in toutes()]
-    assert noms == ["toto", "meteo"]  # pas d'actualités (décision du 2026-10-23)
+    assert noms == ["toto", "meteo", "heure"]  # pas d'actualités (décision du 2026-10-23)
     assert len(set(noms)) == len(noms)
 
 
@@ -114,7 +114,7 @@ def test_real_keywords_trigger_the_right_app(phrase, attendu):
 
 
 @pytest.mark.parametrize("phrase", ["Bonjour BeeDoo", "J'ai mangé une pomme", "Il sourit tout le temps",
-                                    "Je suis fatigué", "Quelle heure est-il ?"])
+                                    "Je suis fatigué", "Il est très gentil"])
 def test_ordinary_sentences_are_left_to_the_llm(phrase):
     assert Routeur(toutes()).router(phrase, contexte()) is None
 
