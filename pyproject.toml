@@ -23,6 +23,10 @@ keywords = ["reachy-mini-app"]
 vision = [
     "deepface",
 ]
+# Simulation du robot (daemon avec MuJoCo), pour développer sans robot. Voir README.
+sim = [
+    "reachy-mini[mujoco]",
+]
 dev = [
     "pytest",
     "pre-commit",

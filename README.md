@@ -51,6 +51,19 @@ python examples/test_connection.py
 
 Le robot doit bouger la tête et les antennes pendant quelques secondes. Si l'application officielle « Reachy Mini Control » est ouverte, ferme-la : elle utilise le même port que le daemon.
 
+### Sans robot : la simulation
+
+Pour développer sans robot, installe l'option de simulation (MuJoCo), puis lance le daemon en mode `--sim` à la place du daemon habituel :
+
+```bash
+source .venv/bin/activate
+pip install -e ".[sim]"
+mjpython -m reachy_mini.daemon.app.main --sim    # macOS
+reachy-mini-daemon --sim                         # Linux et Windows
+```
+
+BeeDoo se connecte ensuite exactement comme avec le vrai robot (`python -m beedoo.main`). Ne lance jamais deux daemons en même temps (même port 8000). En simulation, la carte audio du robot est absente : BeeDoo utilise le micro et les haut-parleurs de l'ordinateur, avec une annulation d'écho logicielle (moins fiable que celle du robot). L'écoute se règle donc au final avec le vrai robot.
+
 ### Version du SDK
 
 Le SDK (`reachy-mini`, installé dans le venv) et le daemon doivent toujours avoir **la même version**. Si tu utilises l'application officielle « Reachy Mini Control », son daemon se met à jour avant le SDK : après une mise à jour, aligne le SDK.
