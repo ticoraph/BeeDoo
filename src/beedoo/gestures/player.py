@@ -18,8 +18,9 @@ ANTENNES_REPOS = (0.0, 0.0)
 
 
 class GesturePlayer:
-    def __init__(self, mini) -> None:
+    def __init__(self, mini, suivi=None) -> None:
         self._mini = mini
+        self._suivi = suivi  # HeadTracker : mis en pause pendant les gestes qui bougent la tête
         self._occupe = threading.Lock()
         self._abandon = threading.Event()
         self._thread: threading.Thread | None = None
@@ -54,18 +55,24 @@ class GesturePlayer:
 
     def _jouer(self, nom: str, etapes: tuple[Step, ...]) -> None:
         log.info("geste : %s", nom)
+        bouge_la_tete = any(e.bouge_la_tete for e in etapes)
+        if bouge_la_tete and self._suivi is not None:
+            self._suivi.pause()
         try:
             for etape in etapes:
                 if self._abandon.is_set():
                     break
                 self._executer(etape)
             if nom != "neutre" and not self._abandon.is_set():
-                for etape in neutre():
+                # Un geste d'antennes seul ne touche pas à la tête, donc le retour non plus.
+                for etape in (neutre() if bouge_la_tete else (Step(duree=0.8, antennes=(0, 0)),)):
                     self._executer(etape)
         except Exception:
             # Une erreur de connexion ne doit pas faire tomber l'application.
             log.exception("geste %s interrompu par une erreur", nom)
         finally:
+            if bouge_la_tete and self._suivi is not None:
+                self._suivi.resume()
             self._occupe.release()
 
     def _executer(self, etape: Step) -> None:
@@ -76,6 +83,8 @@ class GesturePlayer:
                 pitch=etape.tangage or 0.0, yaw=etape.lacet or 0.0, roll=etape.roulis or 0.0, degrees=True
             )
         antennes = None if etape.antennes is None else [math.radians(a) for a in etape.antennes]
-        self._mini.goto_target(head=tete, antennas=antennes, duration=etape.duree, method="minjerk")
+        # Sans mouvement de tête, on garde l'orientation actuelle du corps (le suivi du visage peut l'avoir tournée).
+        corps = {} if tete is not None else {"body_yaw": None}
+        self._mini.goto_target(head=tete, antennas=antennes, duration=etape.duree, method="minjerk", **corps)
         if etape.pause:
             self._abandon.wait(etape.pause)

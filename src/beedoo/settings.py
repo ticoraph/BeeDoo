@@ -22,12 +22,14 @@ VOIX = ("fable", "coral", "shimmer", "nova", "marin")
 class Settings:
     muet: bool = False
     vitesse: float = 1.0  # vitesse de la voix, 0,5 à 1,5
+    suivi: bool = True  # la tête suit le visage de la personne
     voix: str = ""  # voix OpenAI choisie dans l'interface ; vide = celle de la configuration (.env)
 
     def clamp(self) -> "Settings":
         """Ramène chaque valeur dans ses limites (modifie l'objet et le renvoie)."""
         self.vitesse = min(1.5, max(0.5, float(self.vitesse)))
         self.muet = bool(self.muet)
+        self.suivi = bool(self.suivi)
         self.voix = self.voix if self.voix in VOIX else ""
         return self
 

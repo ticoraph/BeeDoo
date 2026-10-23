@@ -8,6 +8,7 @@ from beedoo.config import Config
 from beedoo.gestures.player import GesturePlayer
 from beedoo.settings import Settings
 from beedoo.state import State, StateMachine
+from beedoo.tracking import HeadTracker
 from beedoo.vision.enrollment import Enrollment
 from beedoo.vision.faces import FaceStore
 from beedoo.vision.greeter import Greeter
@@ -28,6 +29,7 @@ class Runtime:
     greeter: Greeter | None = None
     enrolement: Enrollment | None = None  # None sans caméra
     vision: VisionLoop | None = None
+    suivi: HeadTracker | None = None
     echange: dict | None = None  # dernière phrase entendue et dite, en mémoire seulement
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -40,9 +42,14 @@ class Runtime:
             self.machine.go(State.VEILLE)
         log.info("muet : %s", "oui" if muet else "non")
 
-    def set_reglages(self, vitesse: float | None = None, voix: str | None = None) -> None:
-        """Change la vitesse et/ou la voix de BeeDoo, et l'enregistre."""
+    def set_reglages(self, vitesse: float | None = None, voix: str | None = None,
+                     suivi: bool | None = None) -> None:
+        """Change la vitesse, la voix et/ou le suivi du visage, et l'enregistre."""
         with self._lock:
+            if suivi is not None:
+                self.settings.suivi = suivi
+                if self.suivi is not None:
+                    self.suivi.set_voulu(suivi)
             if vitesse is not None:
                 self.settings.vitesse = vitesse
             if voix is not None:

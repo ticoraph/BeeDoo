@@ -41,6 +41,7 @@ class ReglagesRequest(BaseModel):
     vitesse: float | None = Field(default=None, ge=0.5, le=1.5)
     voix: str | None = None
     volume: int | None = Field(default=None, ge=0, le=100)
+    suivi: bool | None = None
 
 
 class PrenomRequest(BaseModel):
@@ -110,7 +111,7 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
 
     def reglages() -> dict:
         return {"vitesse": runtime.settings.vitesse, "voix": runtime.settings.voix or runtime.config.tts_voice,
-                "voix_possibles": list(VOIX), "volume": robot_volume.lire(runtime.config.daemon_url)}
+                "voix_possibles": list(VOIX), "suivi": runtime.settings.suivi, "volume": robot_volume.lire(runtime.config.daemon_url)}
 
     @app.get("/api/reglages")
     def lire_reglages() -> dict:
@@ -122,7 +123,7 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
             raise HTTPException(status_code=422, detail="voix inconnue")
         if requete.volume is not None and not robot_volume.regler(runtime.config.daemon_url, requete.volume):
             raise HTTPException(status_code=502, detail="le robot ne répond pas")
-        runtime.set_reglages(requete.vitesse, requete.voix)
+        runtime.set_reglages(requete.vitesse, requete.voix, requete.suivi)
         return reglages()
 
     @app.post("/api/test-voix", status_code=202)

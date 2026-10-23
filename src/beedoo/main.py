@@ -19,6 +19,7 @@ from beedoo.logs import setup_logging
 from beedoo.greeting import Salutation
 from beedoo.runtime import Runtime
 from beedoo.settings import Settings
+from beedoo.tracking import HeadTracker
 from beedoo.ui.web import WebServer
 from beedoo.vision.enrollment import Enrollment
 from beedoo.vision.faces import FaceRecognizer, FaceStore
@@ -44,7 +45,9 @@ class Beedoo(ReachyMiniApp):
         def get_frame():
             return reachy_mini.media.get_frame()
 
-        runtime = Runtime(config=config, settings=settings, gestes=GesturePlayer(reachy_mini),
+        suivi = HeadTracker(reachy_mini, settings.suivi)
+        runtime = Runtime(config=config, settings=settings, gestes=GesturePlayer(reachy_mini, suivi),
+                          suivi=suivi,
                           speaker=Speaker(reachy_mini, config, settings), faces=faces, greeter=Greeter(),
                           enrolement=Enrollment(get_frame, recognizer))
         vision = VisionLoop(get_frame, recognizer.identify, runtime.greeter, Salutation(runtime).on_event,
@@ -62,6 +65,7 @@ class Beedoo(ReachyMiniApp):
             log.warning("interface web indisponible (port %d occupé ?)", config.web_port)
 
         reachy_mini.goto_target(create_head_pose(), antennas=[0.0, 0.0], duration=1.0)
+        suivi.start()
         vision.start()
         conversation.start()
         try:
@@ -72,6 +76,7 @@ class Beedoo(ReachyMiniApp):
             web.stop()
             runtime.speaker.stop()
             runtime.gestes.stop()
+            suivi.stop()
             log.info("BeeDoo s'arrête (état : %s)", runtime.machine.state.value)
 
 

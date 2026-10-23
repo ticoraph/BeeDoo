@@ -94,6 +94,7 @@ http://127.0.0.1:8765
 - Le port se change avec `BEEDOO_WEB_PORT` dans `.env`. Si le port est déjà pris, BeeDoo démarre quand même, sans la page.
 - Elle n'affiche et ne demande aucune clé API : elles restent dans `.env`.
 - Elle liste les personnes connues : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne).
+- Réglages : volume du robot, vitesse et choix de la voix, interrupteur du suivi du visage (la tête suit la personne du regard).
 - Le réglage « muet » coupe l'écoute et la parole. Il est enregistré dans `data/settings.json` (ignoré par git).
 
 ## Vie privée

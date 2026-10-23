@@ -100,3 +100,45 @@ def test_robot_error_releases_player():
     player = GesturePlayer(Casse())
     player.play("oui")
     attendre(player)
+
+
+class FauxSuivi:
+    def __init__(self):
+        self.evenements = []
+
+    def pause(self):
+        self.evenements.append("pause")
+
+    def resume(self):
+        self.evenements.append("reprise")
+
+
+def test_head_gesture_pauses_tracking_then_resumes():
+    robot, suivi = FauxRobot(), FauxSuivi()
+    player = GesturePlayer(robot, suivi)
+    player.play("oui")
+    attendre(player)
+    assert suivi.evenements == ["pause", "reprise"]
+
+
+def test_antenna_gesture_leaves_head_to_tracking():
+    robot, suivi = FauxRobot(), FauxSuivi()
+    player = GesturePlayer(robot, suivi)
+    player.play("antennes_content")
+    attendre(player)
+    assert suivi.evenements == []  # le suivi n'est pas interrompu
+    assert all(a["head"] is None for a in robot.appels)  # pas même au retour au repos
+    assert all(a.get("body_yaw", 0) is None for a in robot.appels)  # le corps garde son orientation
+    assert robot.appels[-1]["antennas"] == [0.0, 0.0]
+
+
+def test_tracking_resumes_even_if_the_robot_fails():
+    class Casse(FauxRobot):
+        def goto_target(self, **kwargs):
+            raise ConnectionError("daemon parti")
+
+    suivi = FauxSuivi()
+    player = GesturePlayer(Casse(), suivi)
+    player.play("non")
+    attendre(player)
+    assert suivi.evenements == ["pause", "reprise"]

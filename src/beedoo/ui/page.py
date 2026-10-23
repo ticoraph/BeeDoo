@@ -29,6 +29,7 @@ PAGE = """<!doctype html>
   .reglage { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .reglage label { flex: 0 0 9rem; margin: 0; }
   .reglage input[type=range] { flex: 1; padding: 0; }
+  .reglage input[type=checkbox] { flex: 0; width: 1.2rem; height: 1.2rem; }
   select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
   #erreur { color: #b3261e; min-height: 1.5em; }
 </style>
@@ -52,7 +53,9 @@ PAGE = """<!doctype html>
     <p class="note">Gardé en mémoire seulement, effacé à la fin de la conversation.</p>
   </section>
   <section class="carte">
-    <h2>Voix et volume</h2>
+    <h2>Réglages</h2>
+    <div class="reglage"><label for="suivi">Suivi du visage</label>
+      <input id="suivi" type="checkbox"><span>la tête me suit du regard</span></div>
     <div class="reglage"><label for="volume">Volume du robot</label>
       <input id="volume" type="range" min="0" max="100" step="5"><output id="volume-valeur"></output></div>
     <div class="reglage"><label for="vitesse">Vitesse de la voix</label>
@@ -160,6 +163,7 @@ PAGE = """<!doctype html>
       const voix = $("voix");
       if (!voix.options.length) for (const v of r.voix_possibles) voix.add(new Option(v, v));
       voix.value = r.voix;
+      $("suivi").checked = r.suivi;
       $("vitesse").value = String(r.vitesse >= 1.15 ? 1.3 : r.vitesse <= 0.85 ? 0.7 : 1);
       $("volume").disabled = r.volume === null;
       if (r.volume !== null) { $("volume").value = r.volume; $("volume-valeur").textContent = r.volume + " %"; }
@@ -183,6 +187,7 @@ PAGE = """<!doctype html>
   $("volume").addEventListener("input", () => { $("volume-valeur").textContent = $("volume").value + " %"; });
   $("volume").addEventListener("change", () => changerReglage({ volume: Number($("volume").value) }));
   $("vitesse").addEventListener("change", () => changerReglage({ vitesse: Number($("vitesse").value) }));
+  $("suivi").addEventListener("change", () => changerReglage({ suivi: $("suivi").checked }));
   $("voix").addEventListener("change", () => changerReglage({ voix: $("voix").value }));
   $("test-voix").addEventListener("click", async () => {
     try { await envoyer("POST", "/api/test-voix"); $("reglages-info").textContent = ""; }

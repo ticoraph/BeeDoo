@@ -279,3 +279,21 @@ def test_echange_endpoint(runtime):
     assert client.get("/api/echange", headers=LOCAL).json() == {"echange": None}
     runtime.echange = {"entendu": "Salut", "dit": "Coucou"}
     assert client.get("/api/echange", headers=LOCAL).json()["echange"]["dit"] == "Coucou"
+
+
+def test_tracking_switch_is_saved_and_applied(runtime, monkeypatch):
+    from beedoo import robot_volume
+
+    monkeypatch.setattr(robot_volume, "lire", lambda url: 50)
+
+    class Suivi:
+        voulu = []
+
+        def set_voulu(self, v):
+            self.voulu.append(v)
+
+    runtime.suivi = Suivi()
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.get("/api/reglages", headers=LOCAL).json()["suivi"] is True
+    assert client.post("/api/reglages", json={"suivi": False}, headers=LOCAL).json()["suivi"] is False
+    assert Suivi.voulu == [False] and Settings.load(runtime.config.data_dir).suivi is False
