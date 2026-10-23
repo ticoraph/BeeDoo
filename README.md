@@ -51,6 +51,22 @@ python examples/test_connection.py
 
 Le robot doit bouger la tête et les antennes pendant quelques secondes. Si l'application officielle « Reachy Mini Control » est ouverte, ferme-la : elle utilise le même port que le daemon.
 
+### Version du SDK
+
+Le SDK (`reachy-mini`, installé dans le venv) et le daemon doivent toujours avoir **la même version**. Si tu utilises l'application officielle « Reachy Mini Control », son daemon se met à jour avant le SDK : après une mise à jour, aligne le SDK.
+
+Un écart déclenche, à la connexion, un avertissement qui donne les deux versions :
+
+```
+Reachy Mini SDK and daemon versions do not match: SDK=1.10.0, daemon=1.11.0
+```
+
+Dans ce cas, installe la version du daemon, puis relance `pytest` :
+
+```bash
+pip install "reachy-mini==1.11.0"
+```
+
 ## Vie privée
 
 BeeDoo manipule des données sensibles : visages, voix, conversations.
