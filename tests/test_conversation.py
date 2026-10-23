@@ -81,6 +81,9 @@ class FauxChat:
     def reset(self):
         self.resets += 1
 
+    def memoriser(self, texte, reponse):
+        self.memorise = getattr(self, "memorise", []) + [(texte, reponse)]
+
 
 class Horloge:
     t = 100.0
@@ -230,3 +233,92 @@ def test_last_exchange_is_kept_in_memory_then_forgotten(monde):
     c._clock.t += conv.ABSENCE + 1
     c.tick()
     assert runtime.echange is None
+
+
+# --- mini-applications dans la conversation ---
+from beedoo.miniapps.base import MiniApp, Reponse  # noqa: E402
+from beedoo.miniapps.routeur import Routeur  # noqa: E402
+
+
+class Blague(MiniApp):
+    nom, titre = "blague", "Blague"
+    mots_surs = ("blague",)
+    proposition = "Une blague ?"
+
+    def repondre(self, texte, contexte):
+        return Reponse(("Mise en place.", "Chute !"), geste="antennes_content")
+
+
+class FauxGestes:
+    def __init__(self):
+        self.joues = []
+
+    def play(self, nom):
+        self.joues.append(nom)
+        return True
+
+
+@pytest.fixture
+def monde_apps(monde):
+    runtime, micro, chat, horloge, entendu, c = monde
+    runtime.gestes = FauxGestes()
+    runtime.miniapps = [Blague()]
+    c._routeur = Routeur(runtime.miniapps, lambda: runtime.settings.miniapps_desactivees)
+    return runtime, micro, chat, entendu, c
+
+
+def test_miniapp_answers_in_two_parts_without_calling_the_llm(monde_apps):
+    runtime, micro, chat, entendu, c = monde_apps
+    entendu["texte"] = "Raconte-moi une blague !"
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert chat.questions == []  # le LLM n'a pas été sollicité
+    assert runtime.speaker.dit == ["Mise en place.", "Chute !"]
+    assert runtime.gestes.joues == ["antennes_content"]
+    assert runtime.echange["dit"] == "Mise en place. Chute !"
+    assert chat.memorise == [("Raconte-moi une blague !", "Mise en place. Chute !")]  # le LLM s'en souviendra
+    assert runtime.machine.state == State.ECOUTE
+
+
+def test_gesture_comes_with_the_last_part_only(monde_apps):
+    runtime, micro, chat, entendu, c = monde_apps
+    ordre = []
+    runtime.gestes.play = lambda nom: ordre.append(("geste", nom))
+    dit = runtime.speaker.dit
+
+    class Trace(FausseVoix):
+        def say(self, texte):
+            ordre.append(("dit", texte))
+            return True
+
+    runtime.speaker = Trace(runtime)
+    entendu["texte"] = "une blague"
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert ordre == [("dit", "Mise en place."), ("geste", "antennes_content"), ("dit", "Chute !")]
+
+
+def test_ordinary_sentence_still_goes_to_the_llm(monde_apps):
+    runtime, micro, chat, entendu, c = monde_apps
+    c.tick()
+    dire_une_phrase(c, micro)  # « Bonjour BeeDoo, ça va ? »
+    assert len(chat.questions) == 1 and runtime.speaker.dit == ["Salut, ça va bien !"]
+
+
+def test_disabled_miniapp_falls_back_to_the_llm(monde_apps):
+    runtime, micro, chat, entendu, c = monde_apps
+    runtime.settings.miniapps_desactivees = ["blague"]
+    entendu["texte"] = "une blague"
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert len(chat.questions) == 1
+
+
+def test_proposal_is_forgotten_when_the_conversation_ends(monde_apps):
+    runtime, micro, chat, entendu, c = monde_apps
+    c._routeur._en_attente = runtime.miniapps[0]
+    c.tick()
+    runtime.vision.lecture["statut"] = "aucun_visage"
+    c._clock.t += conv.ABSENCE + 1
+    c.tick()
+    assert c._routeur._en_attente is None

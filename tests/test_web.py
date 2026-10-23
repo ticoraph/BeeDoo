@@ -297,3 +297,28 @@ def test_tracking_switch_is_saved_and_applied(runtime, monkeypatch):
     assert client.get("/api/reglages", headers=LOCAL).json()["suivi"] is True
     assert client.post("/api/reglages", json={"suivi": False}, headers=LOCAL).json()["suivi"] is False
     assert Suivi.voulu == [False] and Settings.load(runtime.config.data_dir).suivi is False
+
+
+def test_city_saved_from_the_page(runtime, monkeypatch):
+    from beedoo import robot_volume
+
+    monkeypatch.setattr(robot_volume, "lire", lambda url: 50)
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.post("/api/reglages", json={"ville": "Lyon"}, headers=LOCAL).json()["ville"] == "Lyon"
+    assert Settings.load(runtime.config.data_dir).ville == "Lyon"
+    assert client.post("/api/reglages", json={"ville": "x" * 81}, headers=LOCAL).status_code == 422
+
+
+def test_miniapps_listed_and_toggled(runtime):
+    from beedoo.miniapps import toutes
+
+    runtime.miniapps = toutes()
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    liste = client.get("/api/miniapps", headers=LOCAL).json()["miniapps"]
+    assert [m["nom"] for m in liste] == ["toto", "meteo"] and all(m["active"] for m in liste)
+    reponse = client.post("/api/miniapps/toto", json={"active": False}, headers=LOCAL)
+    assert [m["active"] for m in reponse.json()["miniapps"]] == [False, True]
+    assert Settings.load(runtime.config.data_dir).miniapps_desactivees == ["toto"]
+    assert client.post("/api/miniapps/toto", json={"active": True}, headers=LOCAL).status_code == 200
+    assert Settings.load(runtime.config.data_dir).miniapps_desactivees == []
+    assert client.post("/api/miniapps/inconnue", json={"active": True}, headers=LOCAL).status_code == 404

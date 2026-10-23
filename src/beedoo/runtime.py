@@ -30,6 +30,7 @@ class Runtime:
     enrolement: Enrollment | None = None  # None sans caméra
     vision: VisionLoop | None = None
     suivi: HeadTracker | None = None
+    miniapps: list = field(default_factory=list)  # mini-applications disponibles (miniapps.toutes())
     echange: dict | None = None  # dernière phrase entendue et dite, en mémoire seulement
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -42,10 +43,25 @@ class Runtime:
             self.machine.go(State.VEILLE)
         log.info("muet : %s", "oui" if muet else "non")
 
-    def set_reglages(self, vitesse: float | None = None, voix: str | None = None,
-                     suivi: bool | None = None) -> None:
-        """Change la vitesse, la voix et/ou le suivi du visage, et l'enregistre."""
+    def set_miniapp(self, nom: str, active: bool) -> None:
+        """Active ou désactive une mini-application (KeyError si elle n'existe pas), et l'enregistre."""
+        if nom not in {app.nom for app in self.miniapps}:
+            raise KeyError(nom)
         with self._lock:
+            coupees = set(self.settings.miniapps_desactivees)
+            if active:
+                coupees.discard(nom)
+            else:
+                coupees.add(nom)
+            self.settings.miniapps_desactivees = sorted(coupees)
+            self.settings.save(self.config.data_dir)
+
+    def set_reglages(self, vitesse: float | None = None, voix: str | None = None,
+                     suivi: bool | None = None, ville: str | None = None) -> None:
+        """Change la vitesse, la voix, le suivi du visage et/ou la ville, et l'enregistre."""
+        with self._lock:
+            if ville is not None:
+                self.settings.ville = ville
             if suivi is not None:
                 self.settings.suivi = suivi
                 if self.suivi is not None:

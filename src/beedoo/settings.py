@@ -7,7 +7,7 @@ ne fait jamais planter l'application. Les clés API ne passent pas ici (elles so
 import json
 import logging
 import os
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -23,6 +23,8 @@ class Settings:
     muet: bool = False
     vitesse: float = 1.0  # vitesse de la voix, 0,5 à 1,5
     suivi: bool = True  # la tête suit le visage de la personne
+    ville: str = ""  # pour la météo ; envoyée à Open-Meteo (voir DECISIONS.md)
+    miniapps_desactivees: list[str] = field(default_factory=list)
     voix: str = ""  # voix OpenAI choisie dans l'interface ; vide = celle de la configuration (.env)
 
     def clamp(self) -> "Settings":
@@ -30,6 +32,9 @@ class Settings:
         self.vitesse = min(1.5, max(0.5, float(self.vitesse)))
         self.muet = bool(self.muet)
         self.suivi = bool(self.suivi)
+        self.ville = " ".join(str(self.ville).split())[:80]
+        coupees = self.miniapps_desactivees if isinstance(self.miniapps_desactivees, list) else []
+        self.miniapps_desactivees = sorted({str(nom) for nom in coupees})
         self.voix = self.voix if self.voix in VOIX else ""
         return self
 

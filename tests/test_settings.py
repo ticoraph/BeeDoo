@@ -33,3 +33,12 @@ def test_corrupt_or_wrong_type_file_gives_defaults(tmp_path: Path):
 def test_unknown_keys_are_ignored(tmp_path: Path):
     (tmp_path / SETTINGS_FILE).write_text(json.dumps({"muet": True, "inconnu": 1}))
     assert Settings.load(tmp_path) == Settings(muet=True)
+
+
+def test_city_and_disabled_miniapps_are_saved_and_cleaned(tmp_path):
+    Settings(ville="  Saint   Étienne ", miniapps_desactivees=["meteo", "toto", "meteo"]).save(tmp_path)
+    relu = Settings.load(tmp_path)
+    assert relu.ville == "Saint Étienne" and relu.miniapps_desactivees == ["meteo", "toto"]
+    (tmp_path / SETTINGS_FILE).write_text(json.dumps({"miniapps_desactivees": "toto", "ville": "x" * 200}))
+    relu = Settings.load(tmp_path)
+    assert relu.miniapps_desactivees == [] and len(relu.ville) == 80

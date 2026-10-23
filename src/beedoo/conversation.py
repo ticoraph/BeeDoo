@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable
 
 from beedoo.llm.chat import NE_SAIT_PAS, LLMError
+from beedoo.miniapps.base import Contexte, Reponse
 from beedoo.runtime import Runtime
 from beedoo.state import State
 from beedoo.voice.segmenter import Utterance, UtteranceSegmenter
@@ -25,15 +26,17 @@ ABSENCE = 30.0        # secondes sans voir de visage avant de finir la conversat
 FRAICHEUR = 6.0       # âge maximal (s) d'une analyse de la caméra pour la croire encore valable
 VISAGE_VU = {"reconnu", "inconnu", "ambigu", "trop_petit"}  # états où un visage est devant le robot
 LECTURE = 0.05        # durée (s) maximale d'une lecture du micro
+PAUSE_PARTIES = 0.8   # secondes entre deux parties d'une réponse (mise en place, puis chute d'une blague)
 
 
 class Conversation:
     def __init__(self, runtime: Runtime, media, transcribe: Callable, chat,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic, routeur=None) -> None:
         self._runtime = runtime
         self._media = media
         self._transcribe = transcribe  # (audio, samplerate) -> texte
         self._chat = chat
+        self._routeur = routeur  # mini-applications : essayées avant le LLM
         self._clock = clock
         self._segmenteur: UtteranceSegmenter | None = None
         self._enregistre = False
@@ -128,6 +131,8 @@ class Conversation:
     def _terminer(self) -> None:
         self._couper_micro()
         self._chat.reset()
+        if self._routeur is not None:
+            self._routeur.reset()
         self._runtime.echange = None  # ce qui s'est dit ne survit pas à la conversation
         if self._runtime.machine.state == State.ECOUTE:
             self._aller(State.VEILLE)
@@ -165,6 +170,27 @@ class Conversation:
         except ValueError:
             log.debug("transition ignorée vers %s", etat.value)
 
+    def _miniapp(self, texte: str) -> Reponse | None:
+        """Réponse d'une mini-application si la phrase en déclenche une ; elle est ajoutée à l'historique du LLM."""
+        if self._routeur is None:
+            return None
+        reponse = self._routeur.router(texte, Contexte(settings=self._runtime.settings, prenom=self._prenom()))
+        if reponse is not None:
+            self._chat.memoriser(texte, " ".join(reponse.parties))
+        return reponse
+
+    def _dire(self, reponse: Reponse) -> None:
+        """Dit les parties l'une après l'autre ; le geste accompagne la dernière."""
+        runtime = self._runtime
+        for i, partie in enumerate(reponse.parties):
+            derniere = i == len(reponse.parties) - 1
+            if derniere and reponse.geste and runtime.gestes is not None:
+                runtime.gestes.play(reponse.geste)
+            if runtime.speaker is not None:
+                runtime.speaker.say(partie)
+            if not derniere:
+                self._stop.wait(PAUSE_PARTIES)
+
     def _tour(self, phrase: Utterance) -> None:
         runtime = self._runtime
         self._aller(State.REFLEXION)
@@ -180,16 +206,18 @@ class Conversation:
             return
         transcription = time.monotonic() - debut
         runtime.echange = {"entendu": texte, "dit": ""}
-        try:
-            reponse = self._chat.reply(texte, self._prenom())
-        except LLMError as erreur:
-            log.warning("conversation : le LLM n'a pas répondu (%s)", erreur)
-            reponse = NE_SAIT_PAS
+        reponse = self._miniapp(texte)
+        if reponse is None:
+            try:
+                reponse = Reponse((self._chat.reply(texte, self._prenom()),))
+            except LLMError as erreur:
+                log.warning("conversation : le LLM n'a pas répondu (%s)", erreur)
+                reponse = Reponse((NE_SAIT_PAS,))
         reflexion = time.monotonic() - debut - transcription
-        runtime.echange = {"entendu": texte, "dit": reponse}
+        dit = " ".join(reponse.parties)
+        runtime.echange = {"entendu": texte, "dit": dit}
         self._aller(State.PAROLE)
-        if runtime.speaker is not None:
-            runtime.speaker.say(reponse)
+        self._dire(reponse)
         log.info("conversation : phrase de %.1f s, transcription %.1f s, réponse %.1f s",
                  phrase.duration, transcription, reflexion)
         self._aller(State.ECOUTE)

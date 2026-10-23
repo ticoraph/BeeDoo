@@ -42,6 +42,11 @@ class ReglagesRequest(BaseModel):
     voix: str | None = None
     volume: int | None = Field(default=None, ge=0, le=100)
     suivi: bool | None = None
+    ville: str | None = Field(default=None, max_length=80)
+
+
+class MiniAppRequest(BaseModel):
+    active: bool
 
 
 class PrenomRequest(BaseModel):
@@ -111,7 +116,7 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
 
     def reglages() -> dict:
         return {"vitesse": runtime.settings.vitesse, "voix": runtime.settings.voix or runtime.config.tts_voice,
-                "voix_possibles": list(VOIX), "suivi": runtime.settings.suivi, "volume": robot_volume.lire(runtime.config.daemon_url)}
+                "voix_possibles": list(VOIX), "suivi": runtime.settings.suivi, "ville": runtime.settings.ville, "volume": robot_volume.lire(runtime.config.daemon_url)}
 
     @app.get("/api/reglages")
     def lire_reglages() -> dict:
@@ -123,8 +128,22 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
             raise HTTPException(status_code=422, detail="voix inconnue")
         if requete.volume is not None and not robot_volume.regler(runtime.config.daemon_url, requete.volume):
             raise HTTPException(status_code=502, detail="le robot ne répond pas")
-        runtime.set_reglages(requete.vitesse, requete.voix, requete.suivi)
+        runtime.set_reglages(requete.vitesse, requete.voix, requete.suivi, requete.ville)
         return reglages()
+
+    @app.get("/api/miniapps")
+    def miniapps() -> dict:
+        coupees = set(runtime.settings.miniapps_desactivees)
+        return {"miniapps": [{"nom": m.nom, "titre": m.titre, "active": m.nom not in coupees}
+                             for m in runtime.miniapps]}
+
+    @app.post("/api/miniapps/{nom}")
+    def activer_miniapp(nom: str, requete: MiniAppRequest) -> dict:
+        try:
+            runtime.set_miniapp(nom, requete.active)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="mini-application inconnue") from None
+        return miniapps()
 
     @app.post("/api/test-voix", status_code=202)
     def tester_la_voix() -> dict:

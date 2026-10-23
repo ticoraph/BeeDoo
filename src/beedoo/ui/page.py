@@ -61,8 +61,15 @@ PAGE = """<!doctype html>
     <div class="reglage"><label for="vitesse">Vitesse de la voix</label>
       <select id="vitesse"><option value="0.7">Lente</option><option value="1">Normale</option><option value="1.3">Rapide</option></select></div>
     <div class="reglage"><label for="voix">Voix</label><select id="voix"></select></div>
+    <div class="reglage"><label for="ville">Ma ville (météo)</label>
+      <input id="ville" maxlength="80" placeholder="Ville" autocomplete="off"></div>
     <button id="test-voix" type="button">Écouter la voix</button>
     <p id="reglages-info" aria-live="polite"></p>
+  </section>
+  <section class="carte">
+    <h2>Mini-applications</h2>
+    <ul id="miniapps"></ul>
+    <p class="note">Dis par exemple « une blague de Toto » ou « quel temps fait-il ? ».</p>
   </section>
   <section class="carte">
     <h2>Gestes</h2>
@@ -164,6 +171,7 @@ PAGE = """<!doctype html>
       if (!voix.options.length) for (const v of r.voix_possibles) voix.add(new Option(v, v));
       voix.value = r.voix;
       $("suivi").checked = r.suivi;
+      if (document.activeElement !== $("ville")) $("ville").value = r.ville;
       $("vitesse").value = String(r.vitesse >= 1.15 ? 1.3 : r.vitesse <= 0.85 ? 0.7 : 1);
       $("volume").disabled = r.volume === null;
       if (r.volume !== null) { $("volume").value = r.volume; $("volume-valeur").textContent = r.volume + " %"; }
@@ -188,11 +196,34 @@ PAGE = """<!doctype html>
   $("volume").addEventListener("change", () => changerReglage({ volume: Number($("volume").value) }));
   $("vitesse").addEventListener("change", () => changerReglage({ vitesse: Number($("vitesse").value) }));
   $("suivi").addEventListener("change", () => changerReglage({ suivi: $("suivi").checked }));
+  $("ville").addEventListener("change", () => changerReglage({ ville: $("ville").value }));
   $("voix").addEventListener("change", () => changerReglage({ voix: $("voix").value }));
   $("test-voix").addEventListener("click", async () => {
     try { await envoyer("POST", "/api/test-voix"); $("reglages-info").textContent = ""; }
     catch (err) { $("reglages-info").textContent = err.message; }
   });
+
+  async function chargerMiniapps() {
+    try {
+      const liste = (await (await fetch("/api/miniapps")).json()).miniapps;
+      const zone = $("miniapps");
+      zone.textContent = "";
+      for (const m of liste) {
+        const li = document.createElement("li");
+        const case_ = document.createElement("input");
+        case_.type = "checkbox"; case_.checked = m.active; case_.id = "app-" + m.nom;
+        case_.style.flex = "0 0 auto";
+        case_.addEventListener("change", async () => {
+          try { await envoyer("POST", "/api/miniapps/" + encodeURIComponent(m.nom), { active: case_.checked }); }
+          catch (e) { $("reglages-info").textContent = e.message; }
+        });
+        const etiquette = document.createElement("label");
+        etiquette.htmlFor = case_.id; etiquette.textContent = m.titre; etiquette.style.margin = "0";
+        li.append(case_, etiquette);
+        zone.appendChild(li);
+      }
+    } catch (e) {}
+  }
 
   async function chargerGestes() {
     try {
@@ -312,6 +343,7 @@ PAGE = """<!doctype html>
   });
 
   chargerGestes();
+  chargerMiniapps();
   chargerReglages();
   chargerEchange();
   chargerVision();

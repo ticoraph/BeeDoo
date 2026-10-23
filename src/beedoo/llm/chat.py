@@ -61,6 +61,11 @@ class Chat:
     def reset(self) -> None:
         self._historique = []
 
+    def memoriser(self, texte: str, reponse: str) -> None:
+        """Ajoute à l'historique un échange que le LLM n'a pas produit (mini-application)."""
+        self._historique += [{"role": "user", "content": texte}, {"role": "assistant", "content": reponse}]
+        self._historique = self._historique[-MAX_MESSAGES:]
+
     def reply(self, texte: str, prenom: str = "inconnu", souvenirs: str = "rien pour l'instant",
               maintenant: datetime | None = None) -> str:
         """Réponse de BeeDoo à ce que la personne vient de dire. Lève LLMError en cas d'échec."""
@@ -83,6 +88,5 @@ class Chat:
             raise LLMError(f"réponse impossible ({type(error).__name__})") from None
         if not reponse:
             raise LLMError("réponse vide")
-        self._historique += [{"role": "user", "content": texte}, {"role": "assistant", "content": reponse}]
-        self._historique = self._historique[-MAX_MESSAGES:]
+        self.memoriser(texte, reponse)
         return reponse

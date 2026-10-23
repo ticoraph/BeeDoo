@@ -15,6 +15,8 @@ from beedoo.config import Config
 from beedoo.conversation import Conversation
 from beedoo.gestures.player import GesturePlayer
 from beedoo.llm.chat import Chat
+from beedoo.miniapps import toutes
+from beedoo.miniapps.routeur import Routeur
 from beedoo.logs import setup_logging
 from beedoo.greeting import Salutation
 from beedoo.runtime import Runtime
@@ -47,14 +49,16 @@ class Beedoo(ReachyMiniApp):
 
         suivi = HeadTracker(reachy_mini, settings.suivi)
         runtime = Runtime(config=config, settings=settings, gestes=GesturePlayer(reachy_mini, suivi),
-                          suivi=suivi,
+                          suivi=suivi, miniapps=toutes(),
                           speaker=Speaker(reachy_mini, config, settings), faces=faces, greeter=Greeter(),
                           enrolement=Enrollment(get_frame, recognizer))
         vision = VisionLoop(get_frame, recognizer.identify, runtime.greeter, Salutation(runtime).on_event,
                             active=lambda: not runtime.enrolement.en_cours)
         runtime.vision = vision
         conversation = Conversation(runtime, reachy_mini.media,
-                                    lambda audio, rate: transcribe(config, audio, rate), Chat(config))
+                                    lambda audio, rate: transcribe(config, audio, rate), Chat(config),
+                                    routeur=Routeur(runtime.miniapps,
+                                                    lambda: runtime.settings.miniapps_desactivees))
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 
