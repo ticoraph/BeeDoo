@@ -15,14 +15,13 @@ dependencies = [
     "numpy",
     "fastapi",
     "uvicorn",
+    # Fournit aussi cv2 (opencv-contrib-python-headless). Ne jamais installer opencv-python à côté :
+    # deux paquets qui écrivent dans le même module cv2 se cassent mutuellement (voir DECISIONS.md).
+    "deepface",
 ]
 keywords = ["reachy-mini-app"]
 
 [project.optional-dependencies]
-# Reconnaissance de visage (conflit possible entre paquets OpenCV).
-vision = [
-    "deepface",
-]
 # Simulation du robot (daemon avec MuJoCo), pour développer sans robot. Voir README.
 sim = [
     "reachy-mini[mujoco]",

@@ -1,7 +1,7 @@
 """Prend une photo avec la caméra du Reachy Mini et la sauvegarde en JPEG.
 
-Nécessite la dépendance optionnelle OpenCV :
-    pip install reachy_mini[opencv]
+Nécessite OpenCV (`cv2`), installé avec DeepFace par `pip install -r requirements.txt`.
+N'installe pas `opencv-python` ni `reachy_mini[opencv]` : un second paquet cv2 casserait le premier.
 
 Lancer :
     python scripts/take_picture.py
@@ -16,7 +16,7 @@ try:
     import cv2
 except ImportError:
     print("Erreur : OpenCV est requis pour ce script mais n'est pas installé.")
-    print("Installe-le avec : pip install reachy_mini[opencv]")
+    print("Installe le projet avec : pip install -r requirements.txt")
     sys.exit(1)
 
 from reachy_mini import ReachyMini

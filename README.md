@@ -33,6 +33,8 @@ Si tu as cloné sans `--recurse-submodules` : `git submodule update --init`.
 
 Vérifier que tout est en place : `pytest`.
 
+**Reconnaissance de visage** : elle se fait sur ta machine avec DeepFace (installé par `requirements.txt`, avec OpenCV `headless`). N'installe pas `opencv-python` à côté : deux paquets OpenCV se cassent mutuellement. Au premier usage, les modèles (environ 100 Mo) sont téléchargés depuis GitHub dans `~/.deepface/` : il faut donc un accès à GitHub une fois.
+
 ## Essayer le robot
 
 Dans un premier terminal, lancer le daemon du robot (ou `reachy-mini-daemon --sim` pour la simulation) :
