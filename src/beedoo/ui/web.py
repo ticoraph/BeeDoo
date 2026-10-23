@@ -6,7 +6,10 @@ l'en-tête `Host` doit être l'adresse locale (contre le DNS rebinding) et un en
 existe, doit être celui de la page elle-même.
 """
 
+import base64
+import binascii
 import logging
+import secrets
 import threading
 import time
 
@@ -17,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from beedoo.gestures.library import GESTES
 from beedoo.memory.store import MAX_FAITS
-from beedoo import robot_volume
+from beedoo import logs, robot_volume
 from beedoo.runtime import Runtime
 from beedoo.settings import VOIX
 from beedoo.ui.page import PAGE
@@ -26,6 +29,57 @@ from beedoo.vision.faces import MIN_FACE_PIXELS, person_id
 log = logging.getLogger(__name__)
 
 HOST = "127.0.0.1"
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+MOT_DE_PASSE_MIN = 8
+
+
+def acces_web(hote: str, mot_de_passe: str) -> tuple[str, str | None]:
+    """(adresse d'écoute, mot de passe exigé ou None).
+
+    Par défaut l'interface n'écoute que sur cet ordinateur. Une autre adresse (réseau local) n'est acceptée
+    qu'avec un mot de passe d'au moins 8 caractères ; sinon on reste sur cet ordinateur.
+    """
+    hote = (hote or HOST).strip()
+    if hote in LOOPBACK:
+        return HOST, None
+    if len(mot_de_passe) < MOT_DE_PASSE_MIN:
+        log.error("accès réseau refusé : BEEDOO_WEB_PASSWORD doit faire au moins %d caractères. "
+                  "L'interface reste limitée à cet ordinateur.", MOT_DE_PASSE_MIN)
+        return HOST, None
+    log.warning("interface web ouverte au réseau local, protégée par mot de passe (connexion non chiffrée)")
+    return hote, mot_de_passe
+
+
+class LimiteEssais:
+    """Bloque une adresse après trop d'essais de mot de passe ratés dans une courte durée."""
+
+    def __init__(self, maximum: int = 5, fenetre: float = 60.0, horloge=time.monotonic) -> None:
+        self._maximum, self._fenetre, self._horloge = maximum, fenetre, horloge
+        self._echecs: dict[str, list[float]] = {}
+        self._verrou = threading.Lock()
+
+    def _recents(self, cle: str) -> list[float]:
+        limite = self._horloge() - self._fenetre
+        recents = [t for t in self._echecs.get(cle, []) if t > limite]
+        if recents:
+            self._echecs[cle] = recents
+        else:
+            self._echecs.pop(cle, None)
+        return recents
+
+    def bloque(self, cle: str) -> bool:
+        with self._verrou:
+            return len(self._recents(cle)) >= self._maximum
+
+    def echec(self, cle: str) -> None:
+        with self._verrou:
+            if len(self._echecs) > 1000:  # une machine qui défile les adresses ne remplit pas la mémoire
+                self._echecs.clear()
+            self._echecs.setdefault(cle, []).append(self._horloge())
+
+    def succes(self, cle: str) -> None:
+        with self._verrou:
+            self._echecs.pop(cle, None)
 
 
 class MuetRequest(BaseModel):
@@ -79,19 +133,54 @@ def prenom_valide(valeur: str) -> str:
     return prenom
 
 
-def create_app(runtime: Runtime, port: int) -> FastAPI:
+def mot_de_passe_correct(en_tete: str | None, attendu: str) -> bool:
+    """Vrai si l'en-tête `Authorization: Basic …` porte le bon mot de passe (l'identifiant est libre)."""
+    if not en_tete or not en_tete.lower().startswith("basic "):
+        return False
+    try:
+        fourni = base64.b64decode(en_tete[6:].strip(), validate=True).decode("utf-8").partition(":")[2]
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return False
+    return secrets.compare_digest(fourni.encode(), attendu.encode())  # temps constant
+
+
+def create_app(runtime: Runtime, port: int, mot_de_passe: str | None = None,
+               limite: LimiteEssais | None = None) -> FastAPI:
+    """`mot_de_passe` non nul = accès réseau : mot de passe exigé et adresse d'appel libre (sinon cet ordinateur seul)."""
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    reseau = mot_de_passe is not None
+    limite = limite or LimiteEssais()
     hotes_permis = {f"{HOST}:{port}", f"localhost:{port}"}
 
     @app.middleware("http")
     async def verifier_origine(request: Request, call_next):
         hote = request.headers.get("host", "")
         origine = request.headers.get("origin")
-        if hote not in hotes_permis or (origine is not None and origine != f"http://{hote}"):
+        # Cet ordinateur seul : l'adresse d'appel doit être locale (contre le « DNS rebinding »). Accès réseau :
+        # l'adresse est libre, c'est le mot de passe qui protège. Dans les deux cas, une requête venue d'un
+        # autre site (en-tête Origin différent de la page) est refusée.
+        if (not reseau and hote not in hotes_permis) or (origine is not None and origine != f"http://{hote}"):
             return JSONResponse({"erreur": "refusé"}, status_code=403)
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.middleware("http")
+    async def authentifier(request: Request, call_next):
+        if not reseau:
+            return await call_next(request)
+        client = request.client.host if request.client else "inconnu"
+        if limite.bloque(client):
+            return JSONResponse({"erreur": "trop d'essais, réessaie dans une minute"}, status_code=429,
+                                headers={"Retry-After": "60"})
+        fourni = request.headers.get("authorization")
+        if not mot_de_passe_correct(fourni, mot_de_passe):
+            if fourni:  # seul un mot de passe fourni ET faux compte : le navigateur commence toujours sans rien
+                limite.echec(client)
+            return JSONResponse({"erreur": "mot de passe requis"}, status_code=401,
+                                headers={"WWW-Authenticate": 'Basic realm="BeeDoo", charset="UTF-8"'})
+        limite.succes(client)
+        return await call_next(request)
 
     @app.get("/", response_class=HTMLResponse)
     def accueil() -> str:
@@ -99,7 +188,7 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
 
     @app.get("/api/status")
     def status() -> dict:
-        return runtime.status()
+        return {**runtime.status(), "reseau": reseau}
 
     @app.post("/api/muet")
     def muet(requete: MuetRequest) -> dict:
@@ -168,6 +257,12 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
         threading.Thread(target=runtime.speaker.say, args=("Bonjour ! Voilà ma voix. Elle te plaît ?",),
                          name="beedoo-test-voix", daemon=True).start()
         return {"ok": True}
+
+    @app.get("/api/journal")
+    def journal(depuis: int = 0) -> dict:
+        """Événements récents (messages de BeeDoo, sans clé ni chemin personnel). Perdus à l'arrêt."""
+        lignes, dernier = logs.JOURNAL.depuis(max(depuis, 0))
+        return {"lignes": lignes, "dernier": dernier}
 
     @app.get("/api/echange")
     def echange() -> dict:
@@ -269,9 +364,10 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
 class WebServer:
     """Serveur uvicorn dans un thread, arrêtable proprement."""
 
-    def __init__(self, runtime: Runtime, port: int) -> None:
+    def __init__(self, runtime: Runtime, port: int, host: str = HOST, mot_de_passe: str | None = None) -> None:
         self.port = port
-        config = uvicorn.Config(create_app(runtime, port), host=HOST, port=port,
+        self.host = host
+        config = uvicorn.Config(create_app(runtime, port, mot_de_passe), host=host, port=port,
                                 log_level="warning", access_log=False)
         self._server = uvicorn.Server(config)
         self._thread = threading.Thread(target=self._run, name="beedoo-web", daemon=True)
@@ -292,7 +388,7 @@ class WebServer:
                 self._server.should_exit = True
                 raise OSError(f"le serveur web n'a pas démarré sur le port {self.port}")
             time.sleep(0.05)
-        log.info("interface web : http://%s:%d", HOST, self.port)
+        log.info("interface web : http://%s:%d", self.host, self.port)
 
     def stop(self) -> None:
         self._server.should_exit = True

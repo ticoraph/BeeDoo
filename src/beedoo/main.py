@@ -23,7 +23,7 @@ from beedoo.greeting import Salutation
 from beedoo.runtime import Runtime
 from beedoo.settings import Settings
 from beedoo.tracking import HeadTracker
-from beedoo.ui.web import WebServer
+from beedoo.ui.web import WebServer, acces_web
 from beedoo.vision.enrollment import Enrollment
 from beedoo.vision.faces import FaceRecognizer, FaceStore
 from beedoo.vision.greeter import Greeter
@@ -64,7 +64,8 @@ class Beedoo(ReachyMiniApp):
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 
-        web = WebServer(runtime, config.web_port)
+        hote, mot_de_passe = acces_web(config.web_host, config.web_password)
+        web = WebServer(runtime, config.web_port, hote, mot_de_passe)
         try:
             web.start()
         except OSError:

@@ -24,7 +24,9 @@ class Config:
     tts_voice: str
     web_port: int
     daemon_url: str
+    web_host: str
     openai_api_key: str = field(default="", repr=False)
+    web_password: str = field(default="", repr=False)
 
     @classmethod
     def load(cls, env_file: Path | None = None) -> "Config":
@@ -37,7 +39,9 @@ class Config:
             tts_voice=os.environ.get("OPENAI_TTS_VOICE") or "fable",
             web_port=int(os.environ.get("BEEDOO_WEB_PORT") or 8765),
             daemon_url=(os.environ.get("BEEDOO_DAEMON_URL") or "http://127.0.0.1:8000").rstrip("/"),
+            web_host=(os.environ.get("BEEDOO_WEB_HOST") or "127.0.0.1").strip(),
             openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
+            web_password=os.environ.get("BEEDOO_WEB_PASSWORD", ""),
         )
 
     def missing_keys(self) -> list[str]:

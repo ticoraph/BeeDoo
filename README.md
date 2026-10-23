@@ -84,20 +84,43 @@ pip install "reachy-mini==1.11.0"
 
 ## Interface web
 
-Quand BeeDoo tourne, une page locale affiche son état et un bouton pour couper l'écoute (muet) :
+Quand BeeDoo tourne, une page locale permet de le surveiller et de le régler :
 
 ```
 http://127.0.0.1:8765
 ```
 
-- Elle n'écoute que sur ta machine (`127.0.0.1`), jamais sur le réseau, et ne charge rien depuis Internet.
+Elle a quatre onglets :
+
+- **État** : BeeDoo tourne-t-il, que voit-il (« je te reconnais », « tu es trop loin, approche-toi »), la dernière phrase entendue et dite, l'état de la mémoire, et le bouton **muet** (coupe l'écoute et la parole).
+- **Réglages** : volume du robot, vitesse et choix de la voix, suivi du visage (la tête suit la personne du regard), ta ville pour la météo, activer ou désactiver chaque mini-application, essai de chaque geste.
+- **Personnes** : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne), et les **souvenirs** de chacune.
+- **Journal** : les événements récents (une personne reconnue, une mini-application lancée, une erreur…), sans clé, sans chemin personnel et sans le texte des conversations. Gardé en mémoire seulement, perdu à l'arrêt.
+
+À savoir :
+
+- Par défaut elle n'écoute que sur ta machine (`127.0.0.1`) et ne charge rien depuis Internet. Une requête venue d'un autre site ouvert dans ton navigateur est refusée.
 - Le port se change avec `BEEDOO_WEB_PORT` dans `.env`. Si le port est déjà pris, BeeDoo démarre quand même, sans la page.
 - Elle n'affiche et ne demande aucune clé API : elles restent dans `.env`.
-- Elle liste les personnes connues : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne).
-- Réglages : volume du robot, vitesse et choix de la voix, interrupteur du suivi du visage (la tête suit la personne du regard).
-- Mini-applications : « une blague de Toto », « quel temps fait-il ? » (aujourd'hui ou demain). Pour la météo, écris le nom de ta ville dans les réglages : il est envoyé au service Open-Meteo (gratuit, sans clé). Chaque mini-application peut être désactivée.
-- Souvenirs : par défaut BeeDoo ne retient rien. Si tu coches « accepte que BeeDoo se souvienne » pour une personne, il écrit ses conversations au fur et à mesure et en retient des faits (après un moment de silence) (« sa fille s'appelle Anna »), que tu peux relire, corriger ou effacer dans la page. Effacer une personne supprime aussi tous ses souvenirs.
-- Le réglage « muet » coupe l'écoute et la parole. Il est enregistré dans `data/settings.json` (ignoré par git).
+- Mini-applications : « une blague de Toto », « quel temps fait-il ? » (aujourd'hui ou demain), « quelle heure est-il ? ». Pour la météo, écris le nom de ta ville dans les réglages : il est envoyé au service Open-Meteo (gratuit, sans clé).
+- Souvenirs : par défaut BeeDoo ne retient rien. Si tu coches « accepte que BeeDoo se souvienne » pour une personne, il écrit ses conversations au fur et à mesure et en retient des faits (« sa fille s'appelle Anna ») après un moment de silence. Tu peux les relire, les corriger ou les effacer dans la page. Effacer une personne supprime aussi tous ses souvenirs.
+- Les réglages sont enregistrés dans `data/settings.json` (ignoré par git).
+
+### Ouvrir la page aux autres appareils du réseau (facultatif)
+
+Par défaut, seul l'ordinateur de BeeDoo accède à la page. Pour la consulter depuis une tablette ou un téléphone de la maison, ajoute dans `.env` :
+
+```
+BEEDOO_WEB_HOST=0.0.0.0
+BEEDOO_WEB_PASSWORD=choisis-un-mot-de-passe-long
+```
+
+Relance BeeDoo, puis ouvre `http://<adresse de l'ordinateur>:8765`. Le navigateur demande un mot de passe (l'identifiant est libre, par exemple `beedoo`).
+
+- Sans mot de passe d'au moins 8 caractères, BeeDoo **refuse** d'ouvrir l'accès et reste limité à l'ordinateur (il le dit dans le terminal).
+- Après 5 mots de passe faux de suite, l'adresse est bloquée une minute.
+- **La connexion n'est pas chiffrée (http)** : le mot de passe et le contenu de la page (prénoms, souvenirs) circulent en clair sur le réseau. À n'utiliser que sur un réseau domestique de confiance, jamais sur un Wi-Fi public, et jamais exposé à Internet.
+- Cette ouverture ne se règle que dans `.env`, pas depuis la page.
 
 ## Vie privée
 

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pytest
@@ -36,7 +37,7 @@ def test_page_served_without_external_resources(client):
 
 def test_status_has_no_secret(client):
     body = client.get("/api/status", headers=LOCAL)
-    assert body.json() == {"etat": "veille", "muet": False, "vitesse": 1.0}
+    assert body.json() == {"etat": "veille", "muet": False, "vitesse": 1.0, "reseau": False}
     assert "cle-de-test" not in body.text
 
 
@@ -417,3 +418,18 @@ def test_page_script_keeps_backslash_n_escaped():
 
     # Dans la page, \n doit rester deux caractères (antislash + n) : un vrai retour à la ligne casserait le JavaScript.
     assert 'join("\\n")' in PAGE and 'split("\\n")' in PAGE
+
+
+def test_journal_endpoint(runtime):
+    from beedoo import logs
+
+    logs.JOURNAL.vider()
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.get("/api/journal", headers=LOCAL).json() == {"lignes": [], "dernier": logs.JOURNAL.depuis()[1]}
+    logs.JOURNAL.setFormatter(logging.Formatter("%(message)s"))
+    logs.JOURNAL.handle(logging.LogRecord("beedoo.test", logging.INFO, __file__, 1, "bonjour", None, None))
+    corps = client.get("/api/journal?depuis=0", headers=LOCAL).json()
+    assert corps["lignes"][-1]["message"] == "bonjour"
+    suite = client.get(f"/api/journal?depuis={corps['dernier']}", headers=LOCAL).json()
+    assert suite["lignes"] == []
+    assert client.get("/api/journal", headers={"Host": "exemple.org"}).status_code == 403

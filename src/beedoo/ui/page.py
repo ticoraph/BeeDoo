@@ -32,69 +32,102 @@ PAGE = """<!doctype html>
   .reglage input[type=checkbox] { flex: 0; width: 1.2rem; height: 1.2rem; }
   select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
   #erreur { color: #b3261e; min-height: 1.5em; }
+  nav { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  nav button { background: transparent; color: var(--texte); border-color: var(--bord); padding: 6px 14px; }
+  nav button[aria-selected=true] { background: var(--accent); border-color: var(--accent); color: #2b2b2b; font-weight: 600; }
+  [hidden] { display: none !important; }
+  .alerte { color: #b3261e; font-size: 0.9rem; margin: 8px 0 0; }
+  .journal { max-height: 60vh; overflow-y: auto; font: 0.8rem/1.4 ui-monospace, monospace; }
+  .journal div { padding: 2px 0; border-bottom: 1px solid var(--bord); word-break: break-word; }
+  .journal .WARNING { color: #9a6700; }
+  .journal .ERROR, .journal .CRITICAL { color: #b3261e; }
 </style>
 </head>
 <body>
 <main>
   <h1>BeeDoo</h1>
-  <section class="carte" aria-live="polite">
-    <div class="ligne"><span>Connexion</span><strong id="connexion">…</strong></div>
-    <div class="ligne"><span>État</span><strong id="etat">…</strong></div>
-    <div class="ligne"><span>Muet</span><strong id="muet">…</strong></div>
-  </section>
-  <section class="carte" aria-live="polite">
-    <h2>Ce que BeeDoo voit</h2>
-    <p id="vision">…</p>
-  </section>
-  <section class="carte" aria-live="polite">
-    <h2>Dernière conversation</h2>
-    <p><strong>BeeDoo a entendu :</strong> <span id="entendu">—</span></p>
-    <p><strong>BeeDoo a dit :</strong> <span id="dit">—</span></p>
-    <p class="note">Gardé en mémoire seulement, effacé à la fin de la conversation.</p>
-    <p id="memoire-etat"><strong>Mémoire :</strong> <span id="memoire-texte">—</span></p>
-  </section>
-  <section class="carte">
-    <h2>Réglages</h2>
-    <div class="reglage"><label for="suivi">Suivi du visage</label>
-      <input id="suivi" type="checkbox"><span>la tête me suit du regard</span></div>
-    <div class="reglage"><label for="volume">Volume du robot</label>
-      <input id="volume" type="range" min="0" max="100" step="5"><output id="volume-valeur"></output></div>
-    <div class="reglage"><label for="vitesse">Vitesse de la voix</label>
-      <select id="vitesse"><option value="0.7">Lente</option><option value="1">Normale</option><option value="1.3">Rapide</option></select></div>
-    <div class="reglage"><label for="voix">Voix</label><select id="voix"></select></div>
-    <div class="reglage"><label for="ville">Ma ville (météo)</label>
-      <input id="ville" maxlength="80" placeholder="Ville" autocomplete="off"></div>
-    <button id="test-voix" type="button">Écouter la voix</button>
-    <p id="reglages-info" aria-live="polite"></p>
-  </section>
-  <section class="carte">
-    <h2>Mini-applications</h2>
-    <ul id="miniapps"></ul>
-    <p class="note">Dis par exemple « une blague de Toto » ou « quel temps fait-il ? ».</p>
-  </section>
-  <section class="carte">
-    <h2>Gestes</h2>
-    <div id="gestes" class="boutons"></div>
-    <p id="gestes-info"></p>
-  </section>
-  <section class="carte">
-    <h2>Personnes que BeeDoo connaît</h2>
-    <ul id="personnes"></ul>
-    <form id="ajout" autocomplete="off">
-      <label for="prenom">Ajouter une personne</label>
-      <div class="ligne">
-        <input id="prenom" maxlength="40" placeholder="Prénom" required>
-        <button id="ajouter" type="submit">Ajouter</button>
-      </div>
-      <div class="reglage"><input id="consent-ajout" type="checkbox">
-        <label for="consent-ajout" style="flex:1">Cette personne accepte que BeeDoo se souvienne de ce qu'elle dit</label></div>
-    </form>
-    <p id="personnes-info" aria-live="polite"></p>
-  </section>
-  <section class="carte">
-    <button id="bouton" type="button">…</button>
-    <p id="erreur" role="alert"></p>
-  </section>
+  <nav role="tablist" aria-label="Pages">
+    <button role="tab" id="onglet-etat" data-page="etat" aria-controls="page-etat">État</button>
+    <button role="tab" id="onglet-reglages" data-page="reglages" aria-controls="page-reglages">Réglages</button>
+    <button role="tab" id="onglet-personnes" data-page="personnes" aria-controls="page-personnes">Personnes</button>
+    <button role="tab" id="onglet-journal" data-page="journal" aria-controls="page-journal">Journal</button>
+  </nav>
+
+  <div class="page" id="page-etat" role="tabpanel" aria-labelledby="onglet-etat">
+    <section class="carte" aria-live="polite">
+      <div class="ligne"><span>Connexion</span><strong id="connexion">…</strong></div>
+      <div class="ligne"><span>État</span><strong id="etat">…</strong></div>
+      <div class="ligne"><span>Muet</span><strong id="muet">…</strong></div>
+      <p id="reseau" class="alerte" hidden>Accès réseau ouvert : cette page est protégée par mot de passe, mais la connexion n'est pas chiffrée.</p>
+    </section>
+    <section class="carte">
+      <button id="bouton" type="button">…</button>
+      <p id="erreur" role="alert"></p>
+    </section>
+    <section class="carte" aria-live="polite">
+      <h2>Ce que BeeDoo voit</h2>
+      <p id="vision">…</p>
+    </section>
+    <section class="carte" aria-live="polite">
+      <h2>Dernière conversation</h2>
+      <p><strong>BeeDoo a entendu :</strong> <span id="entendu">—</span></p>
+      <p><strong>BeeDoo a dit :</strong> <span id="dit">—</span></p>
+      <p class="note">Gardé en mémoire seulement, effacé à la fin de la conversation.</p>
+      <p id="memoire-etat"><strong>Mémoire :</strong> <span id="memoire-texte">—</span></p>
+    </section>
+  </div>
+
+  <div class="page" id="page-reglages" role="tabpanel" aria-labelledby="onglet-reglages" hidden>
+    <section class="carte">
+      <h2>Réglages</h2>
+      <div class="reglage"><label for="suivi">Suivi du visage</label>
+        <input id="suivi" type="checkbox"><span>la tête me suit du regard</span></div>
+      <div class="reglage"><label for="volume">Volume du robot</label>
+        <input id="volume" type="range" min="0" max="100" step="5"><output id="volume-valeur"></output></div>
+      <div class="reglage"><label for="vitesse">Vitesse de la voix</label>
+        <select id="vitesse"><option value="0.7">Lente</option><option value="1">Normale</option><option value="1.3">Rapide</option></select></div>
+      <div class="reglage"><label for="voix">Voix</label><select id="voix"></select></div>
+      <div class="reglage"><label for="ville">Ma ville (météo)</label>
+        <input id="ville" maxlength="80" placeholder="Ville" autocomplete="off"></div>
+      <button id="test-voix" type="button">Écouter la voix</button>
+      <p id="reglages-info" aria-live="polite"></p>
+    </section>
+    <section class="carte">
+      <h2>Mini-applications</h2>
+      <ul id="miniapps"></ul>
+      <p class="note">Dis par exemple « une blague de Toto », « quel temps fait-il ? » ou « quelle heure est-il ? ».</p>
+    </section>
+    <section class="carte">
+      <h2>Gestes</h2>
+      <div id="gestes" class="boutons"></div>
+      <p id="gestes-info"></p>
+    </section>
+  </div>
+
+  <div class="page" id="page-personnes" role="tabpanel" aria-labelledby="onglet-personnes" hidden>
+    <section class="carte">
+      <h2>Personnes que BeeDoo connaît</h2>
+      <ul id="personnes"></ul>
+      <form id="ajout" autocomplete="off">
+        <label for="prenom">Ajouter une personne</label>
+        <div class="ligne">
+          <input id="prenom" maxlength="40" placeholder="Prénom" required>
+          <button id="ajouter" type="submit">Ajouter</button>
+        </div>
+        <div class="reglage"><input id="consent-ajout" type="checkbox">
+          <label for="consent-ajout" style="flex:1">Cette personne accepte que BeeDoo se souvienne de ce qu'elle dit</label></div>
+      </form>
+      <p id="personnes-info" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div class="page" id="page-journal" role="tabpanel" aria-labelledby="onglet-journal" hidden>
+    <section class="carte">
+      <h2>Événements récents</h2>
+      <div id="journal" class="journal" role="log" aria-live="off" tabindex="0"></div>
+      <p class="note">Gardé en mémoire seulement (perdu à l'arrêt). Ni clé, ni chemin personnel, ni texte des conversations.</p>
+    </section>
+  </div>
 </main>
 <script>
   let muet = false;
@@ -109,6 +142,7 @@ PAGE = """<!doctype html>
       $("connexion").textContent = "BeeDoo tourne";
       $("etat").textContent = s.etat;
       $("muet").textContent = s.muet ? "oui" : "non";
+      $("reseau").hidden = !s.reseau;
       $("bouton").textContent = s.muet ? "Réactiver l'écoute et la parole" : "Muet : ne plus écouter ni parler";
       $("erreur").textContent = "";
     } catch (e) {
@@ -415,17 +449,62 @@ PAGE = """<!doctype html>
     chargerPersonnes();
   });
 
-  chargerGestes();
-  chargerMiniapps();
-  chargerReglages();
-  chargerEchange();
-  chargerVision();
-  chargerPersonnes();
-  rafraichir();
-  setInterval(rafraichir, 2000);
-  setInterval(chargerPersonnes, 2000);
-  setInterval(chargerVision, 1000);
-  setInterval(chargerEchange, 1500);
+  const PAGES = ["etat", "reglages", "personnes", "journal"];
+  let pageCourante = "etat";
+  let dernierJournal = 0;
+
+  async function chargerJournal() {
+    try {
+      const r = await (await fetch("/api/journal?depuis=" + dernierJournal)).json();
+      const zone = $("journal");
+      if (r.dernier < dernierJournal) zone.textContent = "";  // BeeDoo a redémarré : le journal repart de zéro
+      const enBas = zone.scrollHeight - zone.scrollTop - zone.clientHeight < 40;
+      for (const l of r.lignes) {
+        const d = document.createElement("div");
+        d.className = l.niveau;
+        d.textContent = l.heure + " " + l.niveau + " " + l.source + " — " + l.message;
+        zone.appendChild(d);
+      }
+      while (zone.children.length > 300) zone.removeChild(zone.firstChild);
+      dernierJournal = r.dernier;
+      if (enBas) zone.scrollTop = zone.scrollHeight;
+    } catch (e) {}
+  }
+
+  // Seule la page affichée interroge BeeDoo.
+  function actualiser(ouverture) {
+    rafraichir();
+    if (pageCourante === "etat") { chargerVision(); chargerEchange(); }
+    if (pageCourante === "personnes") chargerPersonnes();
+    if (pageCourante === "journal") chargerJournal();
+    if (ouverture && pageCourante === "reglages") { chargerReglages(); chargerMiniapps(); chargerGestes(); }
+  }
+
+  function montrer(nom) {
+    if (!PAGES.includes(nom)) nom = "etat";
+    pageCourante = nom;
+    for (const p of PAGES) {
+      $("page-" + p).hidden = p !== nom;
+      $("onglet-" + p).setAttribute("aria-selected", String(p === nom));
+      $("onglet-" + p).tabIndex = p === nom ? 0 : -1;
+    }
+    try { history.replaceState(null, "", "#" + nom); } catch (e) {}
+    actualiser(true);
+  }
+
+  for (const p of PAGES) {
+    $("onglet-" + p).addEventListener("click", () => montrer(p));
+    $("onglet-" + p).addEventListener("keydown", (ev) => {
+      const pas = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+      if (!pas) return;
+      const suivante = PAGES[(PAGES.indexOf(p) + pas + PAGES.length) % PAGES.length];
+      montrer(suivante);
+      $("onglet-" + suivante).focus();
+    });
+  }
+
+  montrer(location.hash.slice(1));
+  setInterval(() => actualiser(false), 1500);
 </script>
 </body>
 </html>
