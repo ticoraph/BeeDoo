@@ -1,14 +1,28 @@
 # BeeDoo
 
-BeeDoo est un robot d'accompagnement basé sur un [Reachy Mini](https://github.com/pollen-robotics/reachy_mini) (Pollen Robotics). Il parle français comme un enfant de 7 ans, reconnaît les visages et dit bonjour par le prénom, propose une quinzaine de mini-applications (blague Toto, météo, actualités…) et apprend à connaître les personnes au fil des conversations.
+BeeDoo est un robot d'accompagnement basé sur un [Reachy Mini](https://github.com/pollen-robotics/reachy_mini) (Pollen Robotics). Il parle français comme un enfant de 7 ans, reconnaît les visages et dit bonjour par le prénom, discute, propose des mini-applications (blague Toto, météo, heure et date…) et, si la personne l'accepte, se souvient de ce qu'elle lui dit.
 
-> **État du projet : en construction.** Le cadrage est fait, l'application se construit phase par phase.
+> **État du projet : en construction.** Le robot reconnaît et salue, discute, suit le visage, a des mini-applications, une mémoire facultative et une interface web. Il reste des mini-applications à écrire et des réglages à affiner.
+
+## Aperçu
+
+L'interface web (ici avec des personnes et des conversations **fictives**, générées par `scripts/demo_interface.py`) :
+
+| État | Réglages |
+|---|---|
+| ![Onglet État : BeeDoo reconnaît « Mamie Jeanne », dernière conversation, état de la mémoire](captures/etat.png) | ![Onglet Réglages : suivi du visage, volume, voix, ville, mini-applications, gestes](captures/reglages.png) |
+
+| Personnes | Journal |
+|---|---|
+| ![Onglet Personnes : deux personnes fictives, souvenirs, ajout avec consentement](captures/personnes.png) | ![Onglet Journal : événements récents sans donnée personnelle](captures/journal.png) |
+
+Pour voir l'interface sans robot ni clé : `python scripts/demo_interface.py`, puis ouvrir `http://127.0.0.1:8799`. Pour refaire les captures : `scripts/faire_captures.sh` (Google Chrome requis).
 
 ## Ce qu'il faut
 
 - Un Reachy Mini (Lite, branché en USB, ou Wireless), ou le mode simulation du SDK pour essayer sans robot.
 - Python 3.12 et git.
-- Pour la conversation (à venir) : une clé API OpenAI (LLM, reconnaissance vocale et synthèse vocale).
+- Pour la conversation : une clé API OpenAI (LLM, reconnaissance vocale et synthèse vocale).
 
 ## Installation
 
@@ -138,7 +152,8 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 | `prompts/` | Personnalité de BeeDoo (prompt du LLM) |
 | `src/beedoo/` | Code de l'application (gestes, vision, voix, LLM, mémoire, mini-apps, interface) |
 | `tests/` | Tests |
-| `scripts/` | Petits outils (photo, enregistrement audio) |
+| `scripts/` | Petits outils (photo, enregistrement audio, interface de démonstration, captures) |
+| `captures/` | Captures d'écran de l'interface de démonstration (personnes fictives) |
 | `examples/` | Essais de connexion au robot |
 | `reachy_mini/` | SDK officiel (sous-module git, lecture seule) |
 

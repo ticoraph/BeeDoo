@@ -23,8 +23,9 @@ repos:
         name: interdit .env, data/, photos et sons
         entry: "Fichier personnel interdit dans le dépôt (voir README, section Vie privée)"
         language: fail
-        files: '(^|/)(\.env(\..*)?|data/.*|.*\.(wav|mp3|flac|m4a|ogg|jpe?g|png))$'
-        exclude: '^\.env\.example$'
+        files: '(?i)(^|/)(\.env(\..*)?|data/.*|.*\.(wav|mp3|flac|m4a|ogg|aac|opus|jpe?g|png|gif|bmp|tiff?|webp|heic|heif))$'
+        # Exception étroite : les captures d'écran de l'interface de démonstration (personnes fictives).
+        exclude: '^(\.env\.example|captures/[a-z0-9_-]+\.png)$'
 
       # Chemins absolus d'une machine personnelle.
       - id: forbid-personal-paths
