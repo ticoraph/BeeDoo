@@ -172,7 +172,8 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
     @app.get("/api/echange")
     def echange() -> dict:
         """Dernière phrase entendue et dite, tant que la conversation dure (jamais écrite sur le disque)."""
-        return {"echange": runtime.echange}
+        memoire = runtime.conversation.info_memoire() if runtime.conversation is not None else None
+        return {"echange": runtime.echange, "memoire": memoire}
 
     @app.get("/api/vision")
     def vision() -> dict:

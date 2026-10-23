@@ -424,14 +424,18 @@ def test_other_person_never_hears_what_the_first_one_said(monde_memoire):
     assert all(len(t) == 1 for _, t in appels)  # chacun n'a que ses propres paroles
 
 
-def test_consent_withdrawn_before_consolidation_saves_nothing(monde_memoire):
+def test_consent_withdrawn_stops_extraction_and_later_exchanges(monde_memoire):
     runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
     runtime.memoire.set_consentement("lea", True)
     c.tick()
     dire_une_phrase(c, micro)
     runtime.memoire.set_consentement("lea", False)
+    dire_une_phrase(c, micro)  # une deuxième phrase, après le retrait
     finir(c)
-    assert appels == [] and runtime.memoire.conversations("lea") == []
+    assert appels == []  # plus de faits retenus
+    assert len(runtime.memoire.conversations("lea")) == 1  # ce qui était déjà écrit reste (« Effacer » est à part)
+    texte = (runtime.memoire.root / "lea" / "conversations" / "2026-10-23_1530.md").read_text()
+    assert texte.count("**Léa**") == 1  # la phrase d'après le retrait n'est pas enregistrée
 
 
 def test_person_erased_during_conversation_is_not_resurrected(monde_memoire, tmp_path):
@@ -457,3 +461,76 @@ def test_memory_failure_never_breaks_the_conversation(monde_memoire, monkeypatch
     finir(c)
     assert runtime.machine.state == State.VEILLE
     assert runtime.memoire.conversations("lea") == ["2026-10-23_1530"]  # la conversation est quand même gardée
+
+
+def test_conversation_is_on_disk_right_after_each_exchange_in_one_single_file(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert runtime.memoire.conversations("lea") == ["2026-10-23_1530"]  # déjà là, la conversation n'est pas finie
+    assert runtime.machine.state == State.ECOUTE
+    entendu["texte"] = "Ma fille s'appelle Anna"
+    dire_une_phrase(c, micro)
+    assert runtime.memoire.conversations("lea") == ["2026-10-23_1530"]  # même fichier, complété
+    texte = (runtime.memoire.root / "lea" / "conversations" / "2026-10-23_1530.md").read_text()
+    assert texte.count("**Léa**") == 2 and "Ma fille s'appelle Anna" in texte
+
+
+def test_facts_are_retained_after_a_silence_without_waiting_for_the_end(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    c.tick()
+    assert appels == []  # trop tôt : la personne vient de parler
+    horloge.t += conv.PAUSE_EXTRACTION + 1
+    c.tick()
+    for fil in c._consolidations:
+        fil.join(5)
+    assert len(appels) == 1 and appels[0][1] == [("Bonjour BeeDoo, ça va ?", "Salut, ça va bien !")]
+    assert runtime.machine.state == State.ECOUTE  # la conversation continue
+    c.tick()
+    assert len(appels) == 1  # et on ne recommence pas tant qu'il n'y a rien de nouveau
+
+
+def test_only_new_exchanges_are_examined_each_time(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    horloge.t += conv.PAUSE_EXTRACTION + 1
+    c.tick()
+    for fil in c._consolidations:
+        fil.join(5)
+    entendu["texte"] = "J'ai un chat qui s'appelle Pompon"
+    dire_une_phrase(c, micro)
+    finir(c)
+    assert [len(t) for _, t in appels] == [1, 1]
+    assert appels[1][1][0][0] == "J'ai un chat qui s'appelle Pompon"
+
+
+def test_memory_status_for_the_page(monde_memoire):
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    c.tick()
+    assert c.info_memoire() == {"etat": "desactivee"}  # pas de consentement : la page le dit
+    runtime.memoire.set_consentement("lea", True)
+    assert c.info_memoire()["etat"] == "attente"
+    dire_une_phrase(c, micro)
+    info = c.info_memoire()
+    assert info["etat"] == "enregistre" and info["phrases"] == 1 and info["en_attente"] == 1
+    assert info["pause"] == conv.PAUSE_EXTRACTION
+    horloge.t += conv.RECONNU_RECEMMENT + 1  # on ne sait plus qui est là
+    assert c.info_memoire() == {"etat": "personne"}
+
+
+def test_status_reports_last_result_counts_only(monde_memoire, monkeypatch):
+    from beedoo.memory.extraction import Resultat
+
+    runtime, micro, chat, horloge, entendu, c, appels = monde_memoire
+    monkeypatch.setattr(conv.extraction, "mettre_a_jour", lambda *a, **k: Resultat(2, 1, 0))
+    runtime.memoire.set_consentement("lea", True)
+    c.tick()
+    dire_une_phrase(c, micro)
+    finir(c)
+    assert c.info_memoire()["dernier"] == {"ajoutes": 2, "retires": 1, "rejetes": 0}

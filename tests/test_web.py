@@ -278,7 +278,7 @@ def test_voice_test_needs_speaker_and_no_mute(runtime):
 
 def test_echange_endpoint(runtime):
     client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
-    assert client.get("/api/echange", headers=LOCAL).json() == {"echange": None}
+    assert client.get("/api/echange", headers=LOCAL).json() == {"echange": None, "memoire": None}
     runtime.echange = {"entendu": "Salut", "dit": "Coucou"}
     assert client.get("/api/echange", headers=LOCAL).json()["echange"]["dit"] == "Coucou"
 

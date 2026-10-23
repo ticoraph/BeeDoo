@@ -104,15 +104,20 @@ class MemoryStore:
 
     # --- conversations ------------------------------------------------------------------------
     def enregistrer_conversation(self, personne: str, nom: str, tours: list[tuple[str, str]],
-                                 debut: datetime) -> Path | None:
-        """Écrit la conversation (paroles de la personne, réponses de BeeDoo). None sans consentement ni tour."""
+                                 debut: datetime, chemin: Path | None = None) -> Path | None:
+        """Écrit la conversation (paroles de la personne, réponses de BeeDoo). None sans consentement ni tour.
+
+        On l'appelle après chaque échange : le premier appel choisit le fichier, les suivants le réécrivent
+        (passer le `chemin` reçu). Un chemin hors du dossier des conversations de cette personne est ignoré.
+        """
         if not tours or not self.consentement(personne):
             return None
         dossier = self._dossier(personne) / "conversations"
-        base = debut.strftime("%Y-%m-%d_%H%M")
-        chemin, n = dossier / f"{base}.md", 2
-        while chemin.exists():
-            chemin, n = dossier / f"{base}_{n}.md", n + 1
+        if chemin is None or chemin.parent != dossier:
+            base = debut.strftime("%Y-%m-%d_%H%M")
+            chemin, n = dossier / f"{base}.md", 2
+            while chemin.exists():
+                chemin, n = dossier / f"{base}_{n}.md", n + 1
         lignes = [f"# Conversation du {debut.strftime('%Y-%m-%d à %H:%M')}", ""]
         for dit, reponse in tours:
             lignes += [f"**{nom}** : {dit}", f"**BeeDoo** : {reponse}", ""]

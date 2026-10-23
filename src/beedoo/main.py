@@ -60,6 +60,7 @@ class Beedoo(ReachyMiniApp):
                                     lambda audio, rate: transcribe(config, audio, rate), Chat(config),
                                     routeur=Routeur(runtime.miniapps,
                                                     lambda: runtime.settings.miniapps_desactivees))
+        runtime.conversation = conversation
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 

@@ -32,6 +32,7 @@ class Runtime:
     vision: VisionLoop | None = None
     suivi: HeadTracker | None = None
     memoire: MemoryStore | None = None
+    conversation: object | None = None  # la Conversation en cours (pour afficher l'état de la mémoire)
     miniapps: list = field(default_factory=list)  # mini-applications disponibles (miniapps.toutes())
     echange: dict | None = None  # dernière phrase entendue et dite, en mémoire seulement
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)

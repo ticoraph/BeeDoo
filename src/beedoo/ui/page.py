@@ -51,6 +51,7 @@ PAGE = """<!doctype html>
     <p><strong>BeeDoo a entendu :</strong> <span id="entendu">—</span></p>
     <p><strong>BeeDoo a dit :</strong> <span id="dit">—</span></p>
     <p class="note">Gardé en mémoire seulement, effacé à la fin de la conversation.</p>
+    <p id="memoire-etat"><strong>Mémoire :</strong> <span id="memoire-texte">—</span></p>
   </section>
   <section class="carte">
     <h2>Réglages</h2>
@@ -157,11 +158,22 @@ PAGE = """<!doctype html>
     }
   }
 
+  function phraseMemoire(m) {
+    if (!m || m.etat === "personne") return "je ne sais pas à qui je parle, rien n'est gardé.";
+    if (m.etat === "desactivee") return "désactivée pour toi, rien n'est gardé. Pour l'activer, coche « Accepte que BeeDoo se souvienne » dans Personnes.";
+    const dernier = m.dernier ? " Dernière mise à jour : " + m.dernier.ajoutes + " souvenir(s) ajouté(s), " + m.dernier.retires + " retiré(s)." : "";
+    if (m.etat === "extraction") return "je réfléchis à ce qu'il faut retenir…";
+    if (m.etat === "enregistre") return "activée. " + m.phrases + " échange(s) enregistré(s) dans le fichier de la conversation. Je retiens les faits après " + m.pause + " s de silence, ou à la fin." + dernier;
+    return "activée, je retiendrai ce que tu me dis." + dernier;
+  }
+
   async function chargerEchange() {
     try {
-      const e = (await (await fetch("/api/echange")).json()).echange;
+      const r = await (await fetch("/api/echange")).json();
+      const e = r.echange;
       $("entendu").textContent = e && e.entendu ? e.entendu : "—";
       $("dit").textContent = e && e.dit ? e.dit : "—";
+      $("memoire-texte").textContent = phraseMemoire(r.memoire);
     } catch (err) {}
   }
 

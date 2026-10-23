@@ -7,8 +7,9 @@ Sans personne connue en vue, ou en mode muet, le micro n'est pas lu du tout.
 
 Mémoire (phase 8) : seulement pour les personnes qui ont donné leur consentement. Les souvenirs d'UNE
 personne ne servent qu'à elle : si la personne reconnue change, ou si seul un inconnu est vu depuis plus
-de `RECONNU_RECEMMENT` secondes, l'historique est remis à zéro. À la fin de la conversation (ou à
-l'arrêt), la conversation est enregistrée et les faits retenus sont mis à jour, en arrière-plan.
+de `RECONNU_RECEMMENT` secondes, l'historique est remis à zéro. La conversation est écrite sur le disque après chaque échange ; les faits
+retenus sont mis à jour, en arrière-plan, après `PAUSE_EXTRACTION` secondes de silence, puis à la fin de la
+conversation ou à l'arrêt.
 
 Aucun contenu (phrase entendue, réponse, fait) dans les logs : seulement des durées et des comptes.
 """
@@ -35,6 +36,7 @@ FRAICHEUR = 6.0       # âge maximal (s) d'une analyse de la caméra pour la cro
 VISAGE_VU = {"reconnu", "inconnu", "ambigu", "trop_petit"}  # états où un visage est devant le robot
 LECTURE = 0.05        # durée (s) maximale d'une lecture du micro
 RECONNU_RECEMMENT = 10.0  # s : au-delà, on ne sait plus à qui on parle, donc on n'utilise aucun souvenir
+PAUSE_EXTRACTION = 20.0  # s de silence après un échange avant de retenir des faits (sans attendre la fin)
 ATTENTE_ARRET = 20.0  # s : temps laissé à l'enregistrement de la conversation quand l'application s'arrête
 PAUSE_PARTIES = 0.8   # secondes entre deux parties d'une réponse (mise en place, puis chute d'une blague)
 
@@ -57,7 +59,12 @@ class Conversation:
         self._maintenant = maintenant
         self._pid_conv: str | None = None  # personne à qui l'on parle dans la conversation en cours
         self._tours: list[tuple[str, str]] = []  # (ce qu'elle a dit, ce que BeeDoo a répondu), si elle a consenti
+        self._a_extraire: list[tuple[str, str]] = []  # échanges pas encore passés au crible pour en retenir des faits
+        self._chemin_conv = None                      # fichier de la conversation en cours
+        self._dernier_tour = float("-inf")
+        self._dernier_resultat: dict | None = None
         self._debut_conv = maintenant()
+        self._verrou_extraction = threading.Lock()   # une extraction à la fois
         self._consolidations: list[threading.Thread] = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="beedoo-conversation", daemon=True)
@@ -104,6 +111,7 @@ class Conversation:
             if self._clock() - self._dernier_vu > ABSENCE:
                 self._terminer()
                 return
+            self._extraire_si_calme()
             phrase = self._ecouter()
             if phrase is not None:
                 self._tour(phrase)
@@ -158,29 +166,67 @@ class Conversation:
             self._routeur.reset()
         self._pid_conv = pid
 
-    def _clore_conversation(self) -> None:
-        """Enregistre la conversation de `_pid_conv` et met à jour ses faits, en arrière-plan."""
-        pid, tours, debut = self._pid_conv, self._tours, self._debut_conv
-        self._tours = []
-        self._debut_conv = self._maintenant()
+    def _noter_echange(self, pid: str, texte: str, dit: str) -> None:
+        """Garde l'échange et écrit tout de suite la conversation sur le disque (l'utilisateur peut la relire)."""
+        self._tours.append((texte, dit))
+        self._a_extraire.append((texte, dit))
+        self._dernier_tour = self._clock()
+        try:
+            nom = self._runtime.faces.display_name(pid) if self._runtime.faces is not None else pid
+            self._chemin_conv = self._memoire().enregistrer_conversation(
+                pid, nom, self._tours, self._debut_conv, self._chemin_conv)
+        except OSError as erreur:
+            log.warning("mémoire : conversation non écrite (%s)", type(erreur).__name__)
+
+    def _extraire_si_calme(self) -> None:
+        """Après un moment de silence, retient des faits de ce qui vient d'être dit (sans attendre la fin)."""
+        if (self._a_extraire and self._pid_conv and self._clock() - self._dernier_tour >= PAUSE_EXTRACTION
+                and not any(f.is_alive() for f in self._consolidations)):
+            self._lancer_extraction()
+
+    def _lancer_extraction(self) -> None:
+        pid, tours = self._pid_conv, self._a_extraire
+        self._a_extraire = []
         if not pid or not tours or self._memoire() is None:
             return
-        fil = threading.Thread(target=self._consolider, args=(pid, tours, debut), name="beedoo-memoire", daemon=True)
+        fil = threading.Thread(target=self._extraire, args=(pid, tours), name="beedoo-memoire", daemon=True)
         self._consolidations = [f for f in self._consolidations if f.is_alive()] + [fil]
         fil.start()
 
-    def _consolider(self, pid: str, tours: list[tuple[str, str]], debut: datetime) -> None:
+    def _clore_conversation(self) -> None:
+        """Fin de conversation : retient les faits de ce qui reste, puis repart d'une conversation vierge."""
+        self._lancer_extraction()
+        self._tours = []
+        self._chemin_conv = None
+        self._debut_conv = self._maintenant()
+
+    def _extraire(self, pid: str, tours: list[tuple[str, str]]) -> None:
         runtime, memoire = self._runtime, self._runtime.memoire
-        try:
-            nom = runtime.faces.display_name(pid) if runtime.faces is not None else pid
-            memoire.enregistrer_conversation(pid, nom, tours, debut)  # sans effet si le consentement a été retiré
-            if memoire.consentement(pid):
-                extraction.mettre_a_jour(runtime.config, memoire, pid, tours)
-        except (LLMError, OSError, ValueError) as erreur:
-            log.warning("mémoire : conversation non consolidée (%s)", type(erreur).__name__)
-        except Exception as erreur:
-            log.warning("mémoire : erreur inattendue (%s)", type(erreur).__name__)
-            log.debug("détail", exc_info=True)
+        with self._verrou_extraction:
+            try:
+                if memoire.consentement(pid):  # peut avoir été retiré depuis
+                    resultat = extraction.mettre_a_jour(runtime.config, memoire, pid, tours)
+                    self._dernier_resultat = {"ajoutes": resultat.ajoutes, "retires": resultat.retires,
+                                              "rejetes": resultat.rejetes}
+            except (LLMError, OSError, ValueError) as erreur:
+                log.warning("mémoire : faits non retenus (%s)", type(erreur).__name__)
+            except Exception as erreur:
+                log.warning("mémoire : erreur inattendue (%s)", type(erreur).__name__)
+                log.debug("détail", exc_info=True)
+
+    def info_memoire(self) -> dict:
+        """Où en est la mémoire, pour la page : jamais de contenu, seulement des comptes."""
+        pid = self._pid_courant()
+        if not self._a_consenti(pid):
+            return {"etat": "desactivee" if pid else "personne"}
+        if any(f.is_alive() for f in self._consolidations):
+            etat = "extraction"
+        elif self._tours:
+            etat = "enregistre"
+        else:
+            etat = "attente"
+        return {"etat": etat, "phrases": len(self._tours), "en_attente": len(self._a_extraire),
+                "dernier": self._dernier_resultat, "pause": PAUSE_EXTRACTION}
 
     # --- micro --------------------------------------------------------------------------------
     def _demarrer(self) -> None:
@@ -294,7 +340,7 @@ class Conversation:
         runtime.echange = {"entendu": texte, "dit": dit}
         self._aller(State.PAROLE)
         if self._a_consenti(pid):
-            self._tours.append((texte, dit))
+            self._noter_echange(pid, texte, dit)
         self._dire(reponse)
         log.info("conversation : phrase de %.1f s, transcription %.1f s, réponse %.1f s",
                  phrase.duration, transcription, reflexion)

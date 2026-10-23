@@ -96,7 +96,7 @@ http://127.0.0.1:8765
 - Elle liste les personnes connues : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne).
 - Réglages : volume du robot, vitesse et choix de la voix, interrupteur du suivi du visage (la tête suit la personne du regard).
 - Mini-applications : « une blague de Toto », « quel temps fait-il ? » (aujourd'hui ou demain). Pour la météo, écris le nom de ta ville dans les réglages : il est envoyé au service Open-Meteo (gratuit, sans clé). Chaque mini-application peut être désactivée.
-- Souvenirs : par défaut BeeDoo ne retient rien. Si tu coches « accepte que BeeDoo se souvienne » pour une personne, il enregistre ses conversations et en retient des faits (« sa fille s'appelle Anna »), que tu peux relire, corriger ou effacer dans la page. Effacer une personne supprime aussi tous ses souvenirs.
+- Souvenirs : par défaut BeeDoo ne retient rien. Si tu coches « accepte que BeeDoo se souvienne » pour une personne, il écrit ses conversations au fur et à mesure et en retient des faits (après un moment de silence) (« sa fille s'appelle Anna »), que tu peux relire, corriger ou effacer dans la page. Effacer une personne supprime aussi tous ses souvenirs.
 - Le réglage « muet » coupe l'écoute et la parole. Il est enregistré dans `data/settings.json` (ignoré par git).
 
 ## Vie privée
