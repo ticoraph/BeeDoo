@@ -67,3 +67,24 @@ def test_network_failure_is_a_tts_error(config, monkeypatch):
     monkeypatch.setattr(tts.urllib.request, "urlopen", coupe)
     with pytest.raises(tts.TTSError):
         tts.synthesize(config, "Bonjour")
+
+
+def test_chosen_voice_overrides_configured_one(config, monkeypatch):
+    vu = {}
+
+    class Reponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def faux_urlopen(request, timeout, context):
+        vu["body"] = request.data.decode()
+        return Reponse(b"mp3")
+
+    monkeypatch.setattr(tts.urllib.request, "urlopen", faux_urlopen)
+    tts.synthesize(config, "Salut")
+    assert '"voice": "fable"' in vu["body"]
+    tts.synthesize(config, "Salut", voix="coral")
+    assert '"voice": "coral"' in vu["body"]

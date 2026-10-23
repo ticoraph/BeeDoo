@@ -128,6 +128,7 @@ class Conversation:
     def _terminer(self) -> None:
         self._couper_micro()
         self._chat.reset()
+        self._runtime.echange = None  # ce qui s'est dit ne survit pas à la conversation
         if self._runtime.machine.state == State.ECOUTE:
             self._aller(State.VEILLE)
             log.info("conversation : terminée, le micro est coupé")
@@ -178,12 +179,14 @@ class Conversation:
             self._aller(State.ECOUTE)
             return
         transcription = time.monotonic() - debut
+        runtime.echange = {"entendu": texte, "dit": ""}
         try:
             reponse = self._chat.reply(texte, self._prenom())
         except LLMError as erreur:
             log.warning("conversation : le LLM n'a pas répondu (%s)", erreur)
             reponse = NE_SAIT_PAS
         reflexion = time.monotonic() - debut - transcription
+        runtime.echange = {"entendu": texte, "dit": reponse}
         self._aller(State.PAROLE)
         if runtime.speaker is not None:
             runtime.speaker.say(reponse)

@@ -37,7 +37,7 @@ class Speaker:
         self._interrompu.clear()
         chemin = None
         try:
-            audio = synthesize(self._config, text, self._settings.vitesse)
+            audio = synthesize(self._config, text, self._settings.vitesse, self._settings.voix or None)
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fichier:
                 fichier.write(audio)
                 chemin = fichier.name

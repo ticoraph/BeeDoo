@@ -23,6 +23,7 @@ class Config:
     tts_model: str
     tts_voice: str
     web_port: int
+    daemon_url: str
     openai_api_key: str = field(default="", repr=False)
 
     @classmethod
@@ -35,6 +36,7 @@ class Config:
             tts_model=os.environ.get("OPENAI_TTS_MODEL") or "gpt-4o-mini-tts",
             tts_voice=os.environ.get("OPENAI_TTS_VOICE") or "fable",
             web_port=int(os.environ.get("BEEDOO_WEB_PORT") or 8765),
+            daemon_url=(os.environ.get("BEEDOO_DAEMON_URL") or "http://127.0.0.1:8000").rstrip("/"),
             openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
         )
 

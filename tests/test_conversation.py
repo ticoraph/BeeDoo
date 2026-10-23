@@ -219,3 +219,14 @@ def test_stale_camera_reading_is_not_trusted(monde):
     runtime.vision.lecture["age"] = 60.0
     c.tick()
     assert micro.demarrages == 0
+
+
+def test_last_exchange_is_kept_in_memory_then_forgotten(monde):
+    runtime, micro, *_, c = monde
+    c.tick()
+    dire_une_phrase(c, micro)
+    assert runtime.echange == {"entendu": "Bonjour BeeDoo, ça va ?", "dit": "Salut, ça va bien !"}
+    runtime.vision.lecture["statut"] = "aucun_visage"
+    c._clock.t += conv.ABSENCE + 1
+    c.tick()
+    assert runtime.echange is None

@@ -63,3 +63,20 @@ def test_synthesis_error_is_not_fatal(parle, monkeypatch):
     monkeypatch.setattr(speaker_module, "synthesize", echec)
     assert not speaker.say("Bonjour !")
     assert not speaker.parle
+
+
+def test_chosen_voice_and_speed_reach_the_synthesis(parle, monkeypatch):
+    speaker, robot, settings = parle
+    vus = {}
+
+    def faux(config, texte, vitesse=1.0, voix=None, **k):
+        vus.update(vitesse=vitesse, voix=voix)
+        return b"mp3"
+
+    monkeypatch.setattr(speaker_module, "synthesize", faux)
+    settings.vitesse, settings.voix = 1.3, "coral"
+    speaker.say("Bonjour")
+    assert vus == {"vitesse": 1.3, "voix": "coral"}
+    settings.voix = ""
+    speaker.say("Bonjour")
+    assert vus["voix"] is None  # vide = voix de la configuration

@@ -14,18 +14,21 @@ log = logging.getLogger(__name__)
 
 SETTINGS_FILE = "settings.json"
 
+# Voix OpenAI essayées en S1 (voir DECISIONS.md D1) ; `fable` est la voix par défaut du projet.
+VOIX = ("fable", "coral", "shimmer", "nova", "marin")
+
 
 @dataclass
 class Settings:
     muet: bool = False
-    volume: float = 0.7  # 0 à 1
     vitesse: float = 1.0  # vitesse de la voix, 0,5 à 1,5
+    voix: str = ""  # voix OpenAI choisie dans l'interface ; vide = celle de la configuration (.env)
 
     def clamp(self) -> "Settings":
         """Ramène chaque valeur dans ses limites (modifie l'objet et le renvoie)."""
-        self.volume = min(1.0, max(0.0, float(self.volume)))
         self.vitesse = min(1.5, max(0.5, float(self.vitesse)))
         self.muet = bool(self.muet)
+        self.voix = self.voix if self.voix in VOIX else ""
         return self
 
     @classmethod

@@ -31,11 +31,12 @@ def consigne(vitesse: float) -> str:
     return CONSIGNE.format(debit=debit)
 
 
-def synthesize(config: Config, text: str, vitesse: float = 1.0, timeout: float = 30.0) -> bytes:
+def synthesize(config: Config, text: str, vitesse: float = 1.0, voix: str | None = None,
+               timeout: float = 30.0) -> bytes:
     """Audio MP3 du texte, avec la voix de BeeDoo."""
     if not config.openai_api_key:
         raise TTSError("clé OpenAI absente")
-    body = {"model": config.tts_model, "voice": config.tts_voice, "input": to_spoken(text),
+    body = {"model": config.tts_model, "voice": voix or config.tts_voice, "input": to_spoken(text),
             "instructions": consigne(vitesse), "response_format": "mp3"}
     request = urllib.request.Request(
         URL, data=json.dumps(body).encode(),

@@ -13,10 +13,12 @@ import time
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from beedoo.gestures.library import GESTES
+from beedoo import robot_volume
 from beedoo.runtime import Runtime
+from beedoo.settings import VOIX
 from beedoo.ui.page import PAGE
 from beedoo.vision.faces import MIN_FACE_PIXELS, person_id
 
@@ -31,6 +33,14 @@ class MuetRequest(BaseModel):
 
 class GesteRequest(BaseModel):
     nom: str
+
+
+class ReglagesRequest(BaseModel):
+    """Chaque champ est facultatif : on ne change que ce qui est envoyé."""
+
+    vitesse: float | None = Field(default=None, ge=0.5, le=1.5)
+    voix: str | None = None
+    volume: int | None = Field(default=None, ge=0, le=100)
 
 
 class PrenomRequest(BaseModel):
@@ -97,6 +107,38 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
         if runtime.faces is None or pid not in runtime.faces.people():
             raise HTTPException(status_code=404, detail="personne inconnue")
         return pid
+
+    def reglages() -> dict:
+        return {"vitesse": runtime.settings.vitesse, "voix": runtime.settings.voix or runtime.config.tts_voice,
+                "voix_possibles": list(VOIX), "volume": robot_volume.lire(runtime.config.daemon_url)}
+
+    @app.get("/api/reglages")
+    def lire_reglages() -> dict:
+        return reglages()
+
+    @app.post("/api/reglages")
+    def changer_reglages(requete: ReglagesRequest) -> dict:
+        if requete.voix is not None and requete.voix not in VOIX:
+            raise HTTPException(status_code=422, detail="voix inconnue")
+        if requete.volume is not None and not robot_volume.regler(runtime.config.daemon_url, requete.volume):
+            raise HTTPException(status_code=502, detail="le robot ne répond pas")
+        runtime.set_reglages(requete.vitesse, requete.voix)
+        return reglages()
+
+    @app.post("/api/test-voix", status_code=202)
+    def tester_la_voix() -> dict:
+        if runtime.speaker is None:
+            raise HTTPException(status_code=503, detail="robot non connecté")
+        if runtime.settings.muet:
+            raise HTTPException(status_code=409, detail="BeeDoo est en mode muet")
+        threading.Thread(target=runtime.speaker.say, args=("Bonjour ! Voilà ma voix. Elle te plaît ?",),
+                         name="beedoo-test-voix", daemon=True).start()
+        return {"ok": True}
+
+    @app.get("/api/echange")
+    def echange() -> dict:
+        """Dernière phrase entendue et dite, tant que la conversation dure (jamais écrite sur le disque)."""
+        return {"echange": runtime.echange}
 
     @app.get("/api/vision")
     def vision() -> dict:

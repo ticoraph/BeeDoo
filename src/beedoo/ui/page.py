@@ -25,6 +25,11 @@ PAGE = """<!doctype html>
   input { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); min-width: 0; flex: 1; }
   label { display: block; margin-bottom: 4px; }
   button.petit { padding: 4px 10px; background: transparent; color: var(--texte); border-color: var(--bord); }
+  .note { font-size: 0.85rem; opacity: 0.75; margin-bottom: 0; }
+  .reglage { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .reglage label { flex: 0 0 9rem; margin: 0; }
+  .reglage input[type=range] { flex: 1; padding: 0; }
+  select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
   #erreur { color: #b3261e; min-height: 1.5em; }
 </style>
 </head>
@@ -39,6 +44,22 @@ PAGE = """<!doctype html>
   <section class="carte" aria-live="polite">
     <h2>Ce que BeeDoo voit</h2>
     <p id="vision">…</p>
+  </section>
+  <section class="carte" aria-live="polite">
+    <h2>Dernière conversation</h2>
+    <p><strong>BeeDoo a entendu :</strong> <span id="entendu">—</span></p>
+    <p><strong>BeeDoo a dit :</strong> <span id="dit">—</span></p>
+    <p class="note">Gardé en mémoire seulement, effacé à la fin de la conversation.</p>
+  </section>
+  <section class="carte">
+    <h2>Voix et volume</h2>
+    <div class="reglage"><label for="volume">Volume du robot</label>
+      <input id="volume" type="range" min="0" max="100" step="5"><output id="volume-valeur"></output></div>
+    <div class="reglage"><label for="vitesse">Vitesse de la voix</label>
+      <select id="vitesse"><option value="0.7">Lente</option><option value="1">Normale</option><option value="1.3">Rapide</option></select></div>
+    <div class="reglage"><label for="voix">Voix</label><select id="voix"></select></div>
+    <button id="test-voix" type="button">Écouter la voix</button>
+    <p id="reglages-info" aria-live="polite"></p>
   </section>
   <section class="carte">
     <h2>Gestes</h2>
@@ -123,6 +144,50 @@ PAGE = """<!doctype html>
       $("vision").textContent = "BeeDoo ne répond plus.";
     }
   }
+
+  async function chargerEchange() {
+    try {
+      const e = (await (await fetch("/api/echange")).json()).echange;
+      $("entendu").textContent = e && e.entendu ? e.entendu : "—";
+      $("dit").textContent = e && e.dit ? e.dit : "—";
+    } catch (err) {}
+  }
+
+  let reglagesChargesUneFois = false;
+  async function chargerReglages() {
+    try {
+      const r = await (await fetch("/api/reglages")).json();
+      const voix = $("voix");
+      if (!voix.options.length) for (const v of r.voix_possibles) voix.add(new Option(v, v));
+      voix.value = r.voix;
+      $("vitesse").value = String(r.vitesse >= 1.15 ? 1.3 : r.vitesse <= 0.85 ? 0.7 : 1);
+      $("volume").disabled = r.volume === null;
+      if (r.volume !== null) { $("volume").value = r.volume; $("volume-valeur").textContent = r.volume + " %"; }
+      else $("reglages-info").textContent = "Le volume du robot n'est pas joignable.";
+      reglagesChargesUneFois = true;
+    } catch (err) {
+      $("reglages-info").textContent = "Réglages indisponibles.";
+    }
+  }
+
+  async function changerReglage(corps) {
+    try {
+      await envoyer("POST", "/api/reglages", corps);
+      $("reglages-info").textContent = "";
+    } catch (err) {
+      $("reglages-info").textContent = err.message;
+      chargerReglages();
+    }
+  }
+
+  $("volume").addEventListener("input", () => { $("volume-valeur").textContent = $("volume").value + " %"; });
+  $("volume").addEventListener("change", () => changerReglage({ volume: Number($("volume").value) }));
+  $("vitesse").addEventListener("change", () => changerReglage({ vitesse: Number($("vitesse").value) }));
+  $("voix").addEventListener("change", () => changerReglage({ voix: $("voix").value }));
+  $("test-voix").addEventListener("click", async () => {
+    try { await envoyer("POST", "/api/test-voix"); $("reglages-info").textContent = ""; }
+    catch (err) { $("reglages-info").textContent = err.message; }
+  });
 
   async function chargerGestes() {
     try {
@@ -242,12 +307,15 @@ PAGE = """<!doctype html>
   });
 
   chargerGestes();
+  chargerReglages();
+  chargerEchange();
   chargerVision();
   chargerPersonnes();
   rafraichir();
   setInterval(rafraichir, 2000);
   setInterval(chargerPersonnes, 2000);
   setInterval(chargerVision, 1000);
+  setInterval(chargerEchange, 1500);
 </script>
 </body>
 </html>

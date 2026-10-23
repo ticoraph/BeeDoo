@@ -3,7 +3,7 @@ from pathlib import Path
 from beedoo.config import Config
 
 ENV_NAMES = ("OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_STT_MODEL", "OPENAI_TTS_MODEL",
-             "OPENAI_TTS_VOICE", "BEEDOO_DATA_DIR", "BEEDOO_WEB_PORT")
+             "OPENAI_TTS_VOICE", "BEEDOO_DATA_DIR", "BEEDOO_WEB_PORT", "BEEDOO_DAEMON_URL")
 
 
 def test_defaults_without_env(tmp_path: Path, monkeypatch):
@@ -16,6 +16,7 @@ def test_defaults_without_env(tmp_path: Path, monkeypatch):
     assert config.tts_voice == "fable"
     assert config.data_dir.name == "data"
     assert config.web_port == 8765
+    assert config.daemon_url == "http://127.0.0.1:8000"
     assert config.missing_keys() == ["OPENAI_API_KEY"]
 
 

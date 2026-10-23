@@ -36,7 +36,7 @@ def test_page_served_without_external_resources(client):
 
 def test_status_has_no_secret(client):
     body = client.get("/api/status", headers=LOCAL)
-    assert body.json() == {"etat": "veille", "muet": False, "volume": 0.7, "vitesse": 1.0}
+    assert body.json() == {"etat": "veille", "muet": False, "vitesse": 1.0}
     assert "cle-de-test" not in body.text
 
 
@@ -219,3 +219,63 @@ def test_vision_endpoint_without_and_with_loop(monde_visages):
     corps = client.get("/api/vision", headers=LOCAL).json()
     assert corps["statut"] == "reconnu" and corps["nom"] == "Léa" and "personne" not in corps
     assert corps["min_taille"] >= 1
+
+
+def test_reglages_voice_and_speed_saved(runtime, monkeypatch):
+    from beedoo import robot_volume
+
+    monkeypatch.setattr(robot_volume, "lire", lambda url: 93)
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    lecture = client.get("/api/reglages", headers=LOCAL).json()
+    assert lecture["voix"] == "fable" and lecture["volume"] == 93 and "coral" in lecture["voix_possibles"]
+    reponse = client.post("/api/reglages", json={"voix": "coral", "vitesse": 1.3}, headers=LOCAL)
+    assert reponse.status_code == 200 and reponse.json()["voix"] == "coral"
+    sauve = Settings.load(runtime.config.data_dir)
+    assert sauve.voix == "coral" and sauve.vitesse == 1.3
+
+
+@pytest.mark.parametrize("corps", [{"voix": "inconnue"}, {"vitesse": 9}, {"volume": 150}, {"volume": -1}])
+def test_invalid_reglages_rejected(runtime, monkeypatch, corps):
+    from beedoo import robot_volume
+
+    appels = []
+    monkeypatch.setattr(robot_volume, "regler", lambda url, v: appels.append(v) or True)
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.post("/api/reglages", json=corps, headers=LOCAL).status_code == 422
+    assert appels == [] and runtime.settings.voix == ""
+
+
+def test_volume_goes_to_the_daemon_and_failure_is_reported(runtime, monkeypatch):
+    from beedoo import robot_volume
+
+    vus = []
+    monkeypatch.setattr(robot_volume, "regler", lambda url, v: vus.append((url, v)) or True)
+    monkeypatch.setattr(robot_volume, "lire", lambda url: 40)
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.post("/api/reglages", json={"volume": 40}, headers=LOCAL).status_code == 200
+    assert vus == [("http://127.0.0.1:8000", 40)]
+    monkeypatch.setattr(robot_volume, "regler", lambda url, v: False)
+    assert client.post("/api/reglages", json={"volume": 50}, headers=LOCAL).status_code == 502
+
+
+def test_voice_test_needs_speaker_and_no_mute(runtime):
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.post("/api/test-voix", headers=LOCAL).status_code == 503
+
+    class Voix:
+        dit = []
+
+        def say(self, texte):
+            self.dit.append(texte)
+
+    runtime.speaker = Voix()
+    assert client.post("/api/test-voix", headers=LOCAL).status_code == 202
+    runtime.settings.muet = True
+    assert client.post("/api/test-voix", headers=LOCAL).status_code == 409
+
+
+def test_echange_endpoint(runtime):
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.get("/api/echange", headers=LOCAL).json() == {"echange": None}
+    runtime.echange = {"entendu": "Salut", "dit": "Coucou"}
+    assert client.get("/api/echange", headers=LOCAL).json()["echange"]["dit"] == "Coucou"

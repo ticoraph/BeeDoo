@@ -28,6 +28,7 @@ class Runtime:
     greeter: Greeter | None = None
     enrolement: Enrollment | None = None  # None sans caméra
     vision: VisionLoop | None = None
+    echange: dict | None = None  # dernière phrase entendue et dite, en mémoire seulement
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def set_muet(self, muet: bool) -> None:
@@ -39,11 +40,19 @@ class Runtime:
             self.machine.go(State.VEILLE)
         log.info("muet : %s", "oui" if muet else "non")
 
+    def set_reglages(self, vitesse: float | None = None, voix: str | None = None) -> None:
+        """Change la vitesse et/ou la voix de BeeDoo, et l'enregistre."""
+        with self._lock:
+            if vitesse is not None:
+                self.settings.vitesse = vitesse
+            if voix is not None:
+                self.settings.voix = voix
+            self.settings.clamp().save(self.config.data_dir)
+
     def status(self) -> dict:
         """Ce que l'interface affiche : jamais de clé, de transcription ni d'identité."""
         return {
             "etat": self.machine.state.value,
             "muet": self.settings.muet,
-            "volume": self.settings.volume,
             "vitesse": self.settings.vitesse,
         }
