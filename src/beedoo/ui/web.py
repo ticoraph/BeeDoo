@@ -11,10 +11,11 @@ import threading
 import time
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
+from beedoo.gestures.library import GESTES
 from beedoo.runtime import Runtime
 from beedoo.ui.page import PAGE
 
@@ -25,6 +26,10 @@ HOST = "127.0.0.1"
 
 class MuetRequest(BaseModel):
     muet: bool
+
+
+class GesteRequest(BaseModel):
+    nom: str
 
 
 def create_app(runtime: Runtime, port: int) -> FastAPI:
@@ -53,6 +58,22 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
     def muet(requete: MuetRequest) -> dict:
         runtime.set_muet(requete.muet)
         return runtime.status()
+
+    @app.get("/api/gestes")
+    def gestes() -> dict:
+        player = runtime.gestes
+        return {"gestes": list(GESTES), "disponible": player is not None,
+                "occupe": player is not None and player.occupe}
+
+    @app.post("/api/geste")
+    def geste(requete: GesteRequest) -> dict:
+        if requete.nom not in GESTES:
+            raise HTTPException(status_code=404, detail="geste inconnu")
+        if runtime.gestes is None:
+            raise HTTPException(status_code=503, detail="robot non connecté")
+        if not runtime.gestes.play(requete.nom):
+            raise HTTPException(status_code=409, detail="un geste est déjà en cours")
+        return {"ok": True}
 
     return app
 

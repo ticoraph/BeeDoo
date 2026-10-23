@@ -11,6 +11,7 @@ from reachy_mini import ReachyMini, ReachyMiniApp
 from reachy_mini.utils import create_head_pose
 
 from beedoo.config import Config
+from beedoo.gestures.player import GesturePlayer
 from beedoo.logs import setup_logging
 from beedoo.settings import Settings
 from beedoo.runtime import Runtime
@@ -27,7 +28,7 @@ class Beedoo(ReachyMiniApp):
         setup_logging()
         config = Config.load()
         settings = Settings.load(config.data_dir)
-        runtime = Runtime(config=config, settings=settings)
+        runtime = Runtime(config=config, settings=settings, gestes=GesturePlayer(reachy_mini))
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 
@@ -42,6 +43,7 @@ class Beedoo(ReachyMiniApp):
             stop_event.wait()
         finally:
             web.stop()
+            runtime.gestes.stop()
             log.info("BeeDoo s'arrête (état : %s)", runtime.machine.state.value)
 
 

@@ -16,6 +16,9 @@ PAGE = """<!doctype html>
   .ligne { display: flex; justify-content: space-between; gap: 12px; }
   button { font: inherit; padding: 10px 18px; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: #2b2b2b; cursor: pointer; }
   button:focus-visible { outline: 3px solid var(--texte); outline-offset: 2px; }
+  h2 { margin: 0 0 12px; font-size: 1.1rem; }
+  .boutons { display: flex; flex-wrap: wrap; gap: 8px; }
+  button:disabled { opacity: 0.5; cursor: default; }
   #erreur { color: #b3261e; min-height: 1.5em; }
 </style>
 </head>
@@ -26,6 +29,11 @@ PAGE = """<!doctype html>
     <div class="ligne"><span>Connexion</span><strong id="connexion">…</strong></div>
     <div class="ligne"><span>État</span><strong id="etat">…</strong></div>
     <div class="ligne"><span>Muet</span><strong id="muet">…</strong></div>
+  </section>
+  <section class="carte">
+    <h2>Gestes</h2>
+    <div id="gestes" class="boutons"></div>
+    <p id="gestes-info"></p>
   </section>
   <section class="carte">
     <button id="bouton" type="button">…</button>
@@ -66,6 +74,34 @@ PAGE = """<!doctype html>
     }
   });
 
+  async function chargerGestes() {
+    try {
+      const r = await fetch("/api/gestes");
+      const g = await r.json();
+      const zone = $("gestes");
+      zone.textContent = "";
+      for (const nom of g.gestes) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = nom.replace("_", " ");
+        b.disabled = !g.disponible;
+        b.addEventListener("click", async () => {
+          const rep = await fetch("/api/geste", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nom }),
+          });
+          $("gestes-info").textContent = rep.status === 409 ? "Un geste est déjà en cours." : "";
+        });
+        zone.appendChild(b);
+      }
+      if (!g.disponible) $("gestes-info").textContent = "Robot non connecté.";
+    } catch (e) {
+      $("gestes-info").textContent = "Gestes indisponibles.";
+    }
+  }
+
+  chargerGestes();
   rafraichir();
   setInterval(rafraichir, 2000);
 </script>

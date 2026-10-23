@@ -85,3 +85,32 @@ def test_server_start_stop_and_busy_port(runtime):
     finally:
         premier.stop()
     assert not premier._thread.is_alive()
+
+
+def test_gestes_listed_and_unavailable_without_robot(client):
+    liste = client.get("/api/gestes", headers=LOCAL).json()
+    assert "oui" in liste["gestes"] and liste["disponible"] is False
+    assert client.post("/api/geste", json={"nom": "oui"}, headers=LOCAL).status_code == 503
+    assert client.post("/api/geste", json={"nom": "danse"}, headers=LOCAL).status_code == 404
+
+
+def test_geste_played_and_busy(runtime):
+    from beedoo.gestures.player import GesturePlayer
+
+    class Lent:
+        def __init__(self):
+            self.n = 0
+
+        def goto_target(self, **kwargs):
+            self.n += 1
+            import time
+            time.sleep(0.2)
+
+    robot = Lent()
+    runtime.gestes = GesturePlayer(robot)
+    client = TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+    assert client.post("/api/geste", json={"nom": "non"}, headers=LOCAL).status_code == 200
+    assert client.post("/api/geste", json={"nom": "oui"}, headers=LOCAL).status_code == 409
+    assert client.get("/api/gestes", headers=LOCAL).json()["occupe"] is True
+    runtime.gestes.stop()
+    assert robot.n >= 1

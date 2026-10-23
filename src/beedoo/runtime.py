@@ -5,6 +5,7 @@ import threading
 from dataclasses import dataclass, field
 
 from beedoo.config import Config
+from beedoo.gestures.player import GesturePlayer
 from beedoo.settings import Settings
 from beedoo.state import State, StateMachine
 
@@ -16,6 +17,7 @@ class Runtime:
     config: Config
     settings: Settings
     machine: StateMachine = field(default_factory=StateMachine)
+    gestes: GesturePlayer | None = None  # None tant que le robot n'est pas connecté
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def set_muet(self, muet: bool) -> None:
