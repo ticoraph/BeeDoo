@@ -22,8 +22,8 @@ class State(Enum):
 # Depuis un état, on peut toujours revenir à la veille (arrêt, bouton muet, erreur).
 TRANSITIONS: dict[State, set[State]] = {
     State.VEILLE: {State.ECOUTE, State.PAROLE},  # PAROLE : salutation spontanée
-    State.ECOUTE: {State.REFLEXION, State.VEILLE},
-    State.REFLEXION: {State.PAROLE, State.VEILLE},
+    State.ECOUTE: {State.REFLEXION, State.VEILLE, State.PAROLE},  # PAROLE : salutation d'une arrivée
+    State.REFLEXION: {State.PAROLE, State.ECOUTE, State.VEILLE},  # ECOUTE : phrase non comprise
     State.PAROLE: {State.ECOUTE, State.VEILLE},
 }
 

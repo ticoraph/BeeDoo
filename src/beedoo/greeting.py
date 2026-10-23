@@ -29,8 +29,9 @@ class Salutation:
         if event.kind != SALUE or not event.person:
             return  # visage inconnu : pour l'instant BeeDoo ne dit rien (enrôlement depuis l'interface)
         runtime = self._runtime
-        if runtime.machine.state != State.VEILLE:
-            return  # une conversation est en cours : ne pas l'interrompre
+        avant = runtime.machine.state
+        if avant not in (State.VEILLE, State.ECOUTE):
+            return  # une phrase est en cours de traitement ou de parole : ne pas l'interrompre
         nom = runtime.faces.display_name(event.person)
         log.info("personne reconnue, salutation")
         if runtime.gestes is not None:
@@ -44,4 +45,7 @@ class Salutation:
         try:
             runtime.speaker.say(self._rng.choice(PHRASES).format(nom=nom))
         finally:
-            runtime.machine.go(State.VEILLE)
+            try:
+                runtime.machine.go(avant)
+            except ValueError:  # le mode muet a remis BeeDoo en veille entre-temps
+                pass

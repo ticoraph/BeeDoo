@@ -33,3 +33,13 @@ def test_listener_called_once_per_change():
     machine.go(State.ECOUTE)
     machine.go(State.ECOUTE)  # même état : rien
     assert seen == [(State.VEILLE, State.ECOUTE)]
+
+
+def test_greeting_may_interrupt_listening_and_unclear_sentence_returns_to_listening():
+    machine = StateMachine()
+    machine.go(State.ECOUTE)
+    machine.go(State.PAROLE)
+    machine.go(State.ECOUTE)
+    machine.go(State.REFLEXION)
+    machine.go(State.ECOUTE)
+    assert machine.state == State.ECOUTE

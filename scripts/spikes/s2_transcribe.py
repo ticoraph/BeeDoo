@@ -7,44 +7,16 @@ Par défaut : data/spikes/utterances/*.wav (ignoré par git, ce sont des voix). 
 des sons (.txt), jamais dans un fichier versionné.
 """
 
-import json
-import ssl
 import sys
 import time
-import urllib.request
-import uuid
 from pathlib import Path
 
-import certifi
-
 from beedoo.config import REPO_ROOT, Config
-
-SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
-URL = "https://api.openai.com/v1/audio/transcriptions"
+from beedoo.voice.stt import transcribe_wav
 
 
 def transcribe(config: Config, wav: Path) -> str:
-    boundary = uuid.uuid4().hex
-    fields = {"model": config.stt_model, "language": "fr", "response_format": "json"}
-    parts = [
-        f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
-        for name, value in fields.items()
-    ]
-    parts.append(
-        (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{wav.name}"\r\n'
-         "Content-Type: audio/wav\r\n\r\n").encode() + wav.read_bytes() + b"\r\n"
-    )
-    parts.append(f"--{boundary}--\r\n".encode())
-    request = urllib.request.Request(
-        URL,
-        data=b"".join(parts),
-        headers={
-            "Authorization": f"Bearer {config.openai_api_key}",
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-        },
-    )
-    with urllib.request.urlopen(request, context=SSL_CONTEXT, timeout=60) as response:
-        return json.load(response)["text"]
+    return transcribe_wav(config, wav.read_bytes(), wav.name)
 
 
 def main() -> None:

@@ -102,7 +102,7 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 
 - Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné.
 - Les clés API sont dans `.env`, qui n'est jamais versionné.
-- La reconnaissance de visage tourne en local. Les images de la caméra ne sont jamais enregistrées ni envoyées : seules des empreintes numériques sont gardées dans `data/`. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI, ainsi que le texte des salutations, qui contient le prénom de la personne reconnue. Informe les personnes concernées et respecte leur choix.
+- La reconnaissance de visage tourne en local. Les images de la caméra ne sont jamais enregistrées ni envoyées : seules des empreintes numériques sont gardées dans `data/`. BeeDoo n'écoute que lorsqu'il voit une personne connue (et jamais en mode muet) : sans cela, le micro n'est pas lu. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI, ainsi que le texte des salutations, qui contient le prénom de la personne reconnue. Informe les personnes concernées et respecte leur choix.
 - Si tu contribues : ne pousse jamais de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne ni de chemin personnel. Les exemples et les tests n'utilisent que des personnes fictives. Les garde-fous `pre-commit` vérifient une partie de ces règles.
 
 ## Organisation du dépôt

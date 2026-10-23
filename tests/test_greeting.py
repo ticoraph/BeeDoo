@@ -61,11 +61,20 @@ def test_unknown_face_is_silent(monde):
     assert runtime.speaker.dit == [] and runtime.gestes.joues == []
 
 
-def test_no_greeting_during_a_conversation(monde):
+def test_no_greeting_while_a_sentence_is_being_processed(monde):
+    runtime, salutation = monde
+    runtime.machine.go(State.ECOUTE)
+    runtime.machine.go(State.REFLEXION)
+    salutation.on_event(Event(SALUE, "lea"))
+    assert runtime.speaker.dit == [] and runtime.machine.state == State.REFLEXION
+
+
+def test_greeting_while_listening_returns_to_listening(monde):
     runtime, salutation = monde
     runtime.machine.go(State.ECOUTE)
     salutation.on_event(Event(SALUE, "lea"))
-    assert runtime.speaker.dit == [] and runtime.machine.state == State.ECOUTE
+    assert len(runtime.speaker.dit) == 1 and runtime.speaker.etats == [State.PAROLE]
+    assert runtime.machine.state == State.ECOUTE
 
 
 def test_returns_to_veille_even_if_speaking_fails(monde):

@@ -12,7 +12,9 @@ from reachy_mini import ReachyMini, ReachyMiniApp
 from reachy_mini.utils import create_head_pose
 
 from beedoo.config import Config
+from beedoo.conversation import Conversation
 from beedoo.gestures.player import GesturePlayer
+from beedoo.llm.chat import Chat
 from beedoo.logs import setup_logging
 from beedoo.greeting import Salutation
 from beedoo.runtime import Runtime
@@ -23,6 +25,7 @@ from beedoo.vision.faces import FaceRecognizer, FaceStore
 from beedoo.vision.greeter import Greeter
 from beedoo.vision.loop import VisionLoop
 from beedoo.voice.speaker import Speaker
+from beedoo.voice.stt import transcribe
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +50,8 @@ class Beedoo(ReachyMiniApp):
         vision = VisionLoop(get_frame, recognizer.identify, runtime.greeter, Salutation(runtime).on_event,
                             active=lambda: not runtime.enrolement.en_cours)
         runtime.vision = vision
+        conversation = Conversation(runtime, reachy_mini.media,
+                                    lambda audio, rate: transcribe(config, audio, rate), Chat(config))
         log.info("BeeDoo démarre (muet=%s, clé OpenAI %s)", settings.muet,
                  "absente" if config.missing_keys() else "présente")
 
@@ -58,9 +63,11 @@ class Beedoo(ReachyMiniApp):
 
         reachy_mini.goto_target(create_head_pose(), antennas=[0.0, 0.0], duration=1.0)
         vision.start()
+        conversation.start()
         try:
             stop_event.wait()
         finally:
+            conversation.stop()
             vision.stop()
             web.stop()
             runtime.speaker.stop()
