@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from beedoo.gestures.library import GESTES
 from beedoo.runtime import Runtime
 from beedoo.ui.page import PAGE
+from beedoo.vision.faces import person_id
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,22 @@ class MuetRequest(BaseModel):
 
 class GesteRequest(BaseModel):
     nom: str
+
+
+class PrenomRequest(BaseModel):
+    prenom: str
+
+
+def prenom_valide(valeur: str) -> str:
+    """Prénom nettoyé (1 à 40 caractères avec au moins une lettre ou un chiffre), sinon erreur 422."""
+    prenom = " ".join(valeur.split())
+    try:
+        if not prenom or len(prenom) > 40:
+            raise ValueError
+        person_id(prenom)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="prénom invalide") from None
+    return prenom
 
 
 def create_app(runtime: Runtime, port: int) -> FastAPI:
@@ -73,6 +90,51 @@ def create_app(runtime: Runtime, port: int) -> FastAPI:
             raise HTTPException(status_code=503, detail="robot non connecté")
         if not runtime.gestes.play(requete.nom):
             raise HTTPException(status_code=409, detail="un geste est déjà en cours")
+        return {"ok": True}
+
+    def personne(pid: str) -> str:
+        """Identifiant d'une personne connue, sinon 404 (aucun chemin construit à partir d'un texte brut)."""
+        if runtime.faces is None or pid not in runtime.faces.people():
+            raise HTTPException(status_code=404, detail="personne inconnue")
+        return pid
+
+    @app.get("/api/personnes")
+    def personnes() -> dict:
+        faces = runtime.faces
+        liste = [] if faces is None else [
+            {"id": pid, "nom": faces.display_name(pid), "empreintes": len(faces.embeddings(pid))}
+            for pid in faces.people()]
+        enrolement = runtime.enrolement
+        return {"personnes": liste, "camera": enrolement is not None,
+                "enrolement": None if enrolement is None else enrolement.status()}
+
+    @app.post("/api/personnes", status_code=202)
+    def ajouter(requete: PrenomRequest) -> dict:
+        prenom = prenom_valide(requete.prenom)
+        if runtime.enrolement is None:
+            raise HTTPException(status_code=503, detail="caméra indisponible")
+        if not runtime.enrolement.start(prenom):
+            raise HTTPException(status_code=409, detail="un enrôlement est déjà en cours")
+        return {"ok": True}
+
+    @app.patch("/api/personnes/{pid}")
+    def renommer(pid: str, requete: PrenomRequest) -> dict:
+        pid = personne(pid)
+        try:
+            runtime.faces.rename(pid, prenom_valide(requete.prenom))
+        except ValueError:
+            raise HTTPException(status_code=409, detail="ce prénom existe déjà") from None
+        if runtime.greeter is not None:
+            runtime.greeter.forget(pid)
+        return {"ok": True}
+
+    @app.delete("/api/personnes/{pid}")
+    def effacer(pid: str) -> dict:
+        pid = personne(pid)
+        runtime.faces.forget(pid)
+        if runtime.greeter is not None:
+            runtime.greeter.forget(pid)
+        log.info("une personne a été effacée")
         return {"ok": True}
 
     return app

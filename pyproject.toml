@@ -13,11 +13,13 @@ dependencies = [
     "reachy-mini",
     "python-dotenv",
     "numpy",
+    "certifi",
     "fastapi",
     "uvicorn",
     # Fournit aussi cv2 (opencv-contrib-python-headless). Ne jamais installer opencv-python à côté :
     # deux paquets qui écrivent dans le même module cv2 se cassent mutuellement (voir DECISIONS.md).
     "deepface",
+    "werkzeug",  # importé par DeepFace 0.0.103 sans être déclaré
 ]
 keywords = ["reachy-mini-app"]
 

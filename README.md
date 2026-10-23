@@ -93,7 +93,8 @@ http://127.0.0.1:8765
 - Elle n'écoute que sur ta machine (`127.0.0.1`), jamais sur le réseau, et ne charge rien depuis Internet.
 - Le port se change avec `BEEDOO_WEB_PORT` dans `.env`. Si le port est déjà pris, BeeDoo démarre quand même, sans la page.
 - Elle n'affiche et ne demande aucune clé API : elles restent dans `.env`.
-- Le réglage « muet » est enregistré dans `data/settings.json` (ignoré par git).
+- Elle liste les personnes connues : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne).
+- Le réglage « muet » coupe l'écoute et la parole. Il est enregistré dans `data/settings.json` (ignoré par git).
 
 ## Vie privée
 
@@ -101,7 +102,7 @@ BeeDoo manipule des données sensibles : visages, voix, conversations.
 
 - Tout ce qui concerne les personnes est stocké **localement**, dans le dossier `data/`, qui n'est jamais versionné.
 - Les clés API sont dans `.env`, qui n'est jamais versionné.
-- La reconnaissance de visage tourne en local. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI. Informe les personnes concernées et respecte leur choix.
+- La reconnaissance de visage tourne en local. Les images de la caméra ne sont jamais enregistrées ni envoyées : seules des empreintes numériques sont gardées dans `data/`. En revanche, le texte et l'audio des conversations sont envoyés à OpenAI, ainsi que le texte des salutations, qui contient le prénom de la personne reconnue. Informe les personnes concernées et respecte leur choix.
 - Si tu contribues : ne pousse jamais de clé, de photo, d'enregistrement, de vraie conversation, de prénom de vraie personne ni de chemin personnel. Les exemples et les tests n'utilisent que des personnes fictives. Les garde-fous `pre-commit` vérifient une partie de ces règles.
 
 ## Organisation du dépôt

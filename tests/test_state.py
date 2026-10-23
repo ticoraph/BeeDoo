@@ -13,7 +13,7 @@ def test_normal_conversation_cycle():
 def test_forbidden_transition_raises_and_keeps_state():
     machine = StateMachine()
     with pytest.raises(ValueError):
-        machine.go(State.PAROLE)
+        machine.go(State.REFLEXION)
     assert machine.state == State.VEILLE
 
 

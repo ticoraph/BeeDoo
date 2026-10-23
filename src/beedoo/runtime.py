@@ -8,6 +8,10 @@ from beedoo.config import Config
 from beedoo.gestures.player import GesturePlayer
 from beedoo.settings import Settings
 from beedoo.state import State, StateMachine
+from beedoo.vision.enrollment import Enrollment
+from beedoo.vision.faces import FaceStore
+from beedoo.vision.greeter import Greeter
+from beedoo.voice.speaker import Speaker
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +22,10 @@ class Runtime:
     settings: Settings
     machine: StateMachine = field(default_factory=StateMachine)
     gestes: GesturePlayer | None = None  # None tant que le robot n'est pas connecté
+    speaker: Speaker | None = None
+    faces: FaceStore | None = None
+    greeter: Greeter | None = None
+    enrolement: Enrollment | None = None  # None sans caméra
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def set_muet(self, muet: bool) -> None:

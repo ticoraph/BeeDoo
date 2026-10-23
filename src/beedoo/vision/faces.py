@@ -14,6 +14,7 @@ Voir l'essai S3 (scripts/spikes/s3_threshold.py).
 """
 
 import json
+import os
 import re
 import shutil
 import unicodedata
@@ -95,12 +96,44 @@ class FaceStore:
     def gallery(self) -> dict[str, list[list[float]]]:
         return {person: self.embeddings(person) for person in self.people()}
 
-    def add(self, person: str, new_embeddings: list[list[float]]) -> int:
+    def _read(self, person: str) -> dict:
+        try:
+            return json.loads(self._file(person).read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def _write(self, person: str, data: dict) -> None:
+        """Écriture atomique : la boucle de vision lit ces fichiers pendant que l'interface les modifie."""
         file = self._file(person)
         file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = file.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data))
+        os.replace(tmp, file)
+
+    def display_name(self, person: str) -> str:
+        """Prénom tel qu'il a été saisi (« Léa »), à défaut l'identifiant mis en majuscule initiale."""
+        return self._read(person).get("nom") or person_id(person).replace("-", " ").title()
+
+    def add(self, person: str, new_embeddings: list[list[float]]) -> int:
+        data = self._read(person)
         embeddings = self.embeddings(person) + [list(map(float, e)) for e in new_embeddings]
-        file.write_text(json.dumps({"model": self.model, "embeddings": embeddings}))
+        self._write(person, {"model": self.model, "nom": data.get("nom") or person.strip(),
+                             "embeddings": embeddings})
         return len(embeddings)
+
+    def rename(self, old: str, new: str) -> str:
+        """Change le prénom d'une personne. Retourne le nouvel identifiant."""
+        old_id, new_id = person_id(old), person_id(new)
+        if not self._file(old).exists():
+            raise KeyError(old)
+        if new_id != old_id and self._file(new).parent.exists():
+            raise ValueError("une personne porte déjà ce prénom")
+        data = self._read(old)
+        data["nom"] = new.strip()
+        if new_id != old_id:
+            self._file(old).parent.rename(self._file(new).parent)
+        self._write(new, data)
+        return new_id
 
     def forget(self, person: str) -> None:
         """Efface tout ce que BeeDoo sait de cette personne (le dossier entier)."""

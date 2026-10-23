@@ -61,3 +61,28 @@ def test_store_roundtrip_and_forget(tmp_path):
 def test_embeddings_of_another_model_are_ignored(tmp_path):
     FaceStore(tmp_path, model="ArcFace").add("anna", [unit(1, 0, 0)])
     assert FaceStore(tmp_path, model="Facenet").embeddings("anna") == []
+
+
+def test_display_name_keeps_accents(tmp_path):
+    store = FaceStore(tmp_path)
+    store.add("Léa", [unit(1, 0, 0)])
+    assert store.people() == ["lea"]
+    assert store.display_name("lea") == "Léa"
+    store.add("lea", [unit(0.9, 0.1, 0)])  # un deuxième ajout ne change pas le prénom
+    assert store.display_name("lea") == "Léa"
+
+
+def test_rename_moves_person_and_refuses_duplicates(tmp_path):
+    store = FaceStore(tmp_path)
+    store.add("Léa", [unit(1, 0, 0)])
+    store.add("Paul", [unit(0, 1, 0)])
+    assert store.rename("lea", "Léane") == "leane"
+    assert store.people() == ["leane", "paul"]
+    assert store.display_name("leane") == "Léane"
+    assert len(store.embeddings("leane")) == 1
+    with pytest.raises(ValueError):
+        store.rename("leane", "Paul")
+    with pytest.raises(KeyError):
+        store.rename("absent", "Zoé")
+    assert store.rename("paul", "PAUL") == "paul"  # même identifiant : seul l'affichage change
+    assert store.display_name("paul") == "PAUL"

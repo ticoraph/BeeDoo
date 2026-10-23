@@ -114,3 +114,93 @@ def test_geste_played_and_busy(runtime):
     assert client.get("/api/gestes", headers=LOCAL).json()["occupe"] is True
     runtime.gestes.stop()
     assert robot.n >= 1
+
+
+class FauxEnrolement:
+    def __init__(self):
+        self.demandes = []
+        self.occupe = False
+
+    @property
+    def en_cours(self):
+        return self.occupe
+
+    def status(self):
+        return {"etat": "libre", "fait": 0, "total": 6, "ajoutes": 0}
+
+    def start(self, nom):
+        if self.occupe:
+            return False
+        self.demandes.append(nom)
+        return True
+
+
+@pytest.fixture
+def monde_visages(runtime):
+    from beedoo.vision.faces import FaceStore
+    from beedoo.vision.greeter import Greeter
+
+    runtime.faces = FaceStore(runtime.config.data_dir)
+    runtime.faces.add("Léa", [[1.0, 0.0]])
+    runtime.greeter = Greeter()
+    runtime.enrolement = FauxEnrolement()
+    return runtime, TestClient(create_app(runtime, PORT), base_url=f"http://127.0.0.1:{PORT}")
+
+
+def test_people_listed_without_embeddings_content(monde_visages):
+    _, client = monde_visages
+    corps = client.get("/api/personnes", headers=LOCAL)
+    assert corps.json()["personnes"] == [{"id": "lea", "nom": "Léa", "empreintes": 1}]
+    assert "1.0" not in corps.text  # les empreintes elles-mêmes ne sortent jamais
+
+
+def test_add_person_starts_enrollment_and_cleans_name(monde_visages):
+    runtime, client = monde_visages
+    reponse = client.post("/api/personnes", json={"prenom": "  Mamie   Jeanne "}, headers=LOCAL)
+    assert reponse.status_code == 202
+    assert runtime.enrolement.demandes == ["Mamie Jeanne"]
+
+
+@pytest.mark.parametrize("prenom", ["", "   ", "///", "x" * 41])
+def test_invalid_names_rejected(monde_visages, prenom):
+    runtime, client = monde_visages
+    assert client.post("/api/personnes", json={"prenom": prenom}, headers=LOCAL).status_code == 422
+    assert runtime.enrolement.demandes == []
+
+
+def test_enrollment_busy_and_no_camera(monde_visages):
+    runtime, client = monde_visages
+    runtime.enrolement.occupe = True
+    assert client.post("/api/personnes", json={"prenom": "Paul"}, headers=LOCAL).status_code == 409
+    runtime.enrolement = None
+    assert client.post("/api/personnes", json={"prenom": "Paul"}, headers=LOCAL).status_code == 503
+
+
+def test_rename_and_duplicate(monde_visages):
+    runtime, client = monde_visages
+    runtime.faces.add("Paul", [[0.0, 1.0]])
+    assert client.patch("/api/personnes/lea", json={"prenom": "Léane"}, headers=LOCAL).status_code == 200
+    assert runtime.faces.people() == ["leane", "paul"]
+    assert client.patch("/api/personnes/leane", json={"prenom": "Paul"}, headers=LOCAL).status_code == 409
+    assert client.patch("/api/personnes/absent", json={"prenom": "Zoé"}, headers=LOCAL).status_code == 404
+
+
+def test_delete_person_forgets_everything(monde_visages):
+    runtime, client = monde_visages
+    assert client.delete("/api/personnes/lea", headers=LOCAL).status_code == 200
+    assert runtime.faces.people() == []
+    assert not (runtime.config.data_dir / "personnes" / "lea").exists()
+    assert client.delete("/api/personnes/lea", headers=LOCAL).status_code == 404
+
+
+def test_path_tricks_do_not_reach_the_disk(monde_visages):
+    runtime, client = monde_visages
+    for pid in ("..", "%2e%2e%2f", "..%2Flea", "%2Fetc%2Fpasswd"):
+        assert client.delete(f"/api/personnes/{pid}", headers=LOCAL).status_code in (404, 405)
+    assert runtime.faces.people() == ["lea"]
+
+
+def test_foreign_origin_cannot_delete(monde_visages):
+    runtime, client = monde_visages
+    reponse = client.delete("/api/personnes/lea", headers={**LOCAL, "Origin": "http://exemple.org"})
+    assert reponse.status_code == 403 and runtime.faces.people() == ["lea"]
