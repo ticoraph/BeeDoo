@@ -129,7 +129,7 @@ Elle a quatre onglets :
 
 - **État** : BeeDoo tourne-t-il, que voit-il (« je te reconnais », « tu es trop loin, approche-toi »), la dernière phrase entendue et dite, l'état de la mémoire, et le bouton **muet** (coupe l'écoute et la parole).
 - **Réglages** : volume du robot, vitesse et choix de la voix, suivi du visage (la tête suit la personne du regard), ta ville pour la météo, activer ou désactiver chaque mini-application, essai de chaque geste.
-- **Personnes** : ajouter (BeeDoo prend 6 images de la caméra à quelques secondes d'intervalle, il faut tourner doucement la tête), renommer, effacer (efface tout ce que BeeDoo sait de la personne), et les **souvenirs** de chacune.
+- **Personnes** : ajouter (façon photomaton : BeeDoo dit à voix haute quelle pose prendre — face, tête à gauche, à droite, en haut, en bas, sourire — et fait « Clic ! » à chaque image ; la page affiche la même consigne), renommer, effacer (efface tout ce que BeeDoo sait de la personne), et les **souvenirs** de chacune.
 - **Journal** : les événements récents (une personne reconnue, une mini-application lancée, une erreur…), sans clé, sans chemin personnel et sans le texte des conversations. Gardé en mémoire seulement, perdu à l'arrêt.
 
 À savoir :

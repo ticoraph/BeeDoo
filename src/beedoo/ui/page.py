@@ -38,6 +38,11 @@ PAGE = """<!doctype html>
   nav button[aria-selected=true] { background: var(--accent); border-color: var(--accent); color: #2b2b2b; font-weight: 600; }
   [hidden] { display: none !important; }
   .alerte { color: var(--erreur); font-size: 0.9rem; margin: 8px 0 0; }
+  .consigne { font-size: 1.6rem; font-weight: 700; text-align: center; margin: 4px 0 12px; }
+  .points { display: flex; justify-content: center; gap: 10px; margin-bottom: 12px; }
+  .points span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); }
+  .points .fait { background: var(--accent); }
+  .points .courant { background: var(--accent); box-shadow: 0 0 0 4px var(--bord); }
   .journal { max-height: 60vh; overflow-y: auto; font: 0.8rem/1.4 ui-monospace, monospace; }
   .journal div { padding: 2px 0; border-bottom: 1px solid var(--bord); word-break: break-word; }
   .journal .WARNING { color: var(--avert); }
@@ -106,6 +111,13 @@ PAGE = """<!doctype html>
   </div>
 
   <div class="page" id="page-personnes" role="tabpanel" aria-labelledby="onglet-personnes" hidden>
+    <section class="carte" id="photomaton" aria-live="polite" hidden>
+      <h2>Photomaton : suis la voix de BeeDoo</h2>
+      <p id="pose-consigne" class="consigne"></p>
+      <div id="pose-points" class="points" aria-hidden="true"></div>
+      <p id="pose-info" class="note"></p>
+      <button id="annuler-ajout" type="button" class="petit">Arrêter</button>
+    </section>
     <section class="carte">
       <h2>Personnes que BeeDoo connaît</h2>
       <ul id="personnes"></ul>
@@ -404,6 +416,29 @@ PAGE = """<!doctype html>
     return li;
   }
 
+  function montrerPhotomaton(e) {
+    $("pose-consigne").textContent = e.consigne || "Prépare-toi : mets-toi en face de BeeDoo…";
+    const points = $("pose-points");
+    if (points.children.length !== e.total) {
+      points.textContent = "";
+      for (let i = 0; i < e.total; i++) points.appendChild(document.createElement("span"));
+    }
+    [...points.children].forEach((p, i) => {
+      p.className = e.pose === null ? "" : i < e.pose ? "fait" : i === e.pose ? "courant" : "";
+    });
+    let conseil = "Écoute BeeDoo : il te dit quoi faire, puis il fait « Clic ! ».";
+    if (e.derniere === "aucun_visage") conseil = "Je ne te vois pas : mets-toi en face de moi.";
+    if (e.derniere === "trop_petit") conseil = "Tu es trop loin : approche-toi (visage " + e.taille + " px, il en faut " + e.min_taille + ").";
+    $("pose-info").textContent = conseil + " Images valides : " + e.ajoutes + "/" + e.total + ".";
+    $("personnes-info").textContent = "";
+  }
+
+  $("annuler-ajout").addEventListener("click", async () => {
+    try { await envoyer("DELETE", "/api/enrolement"); }
+    catch (err) { $("personnes-info").textContent = err.message; }
+    chargerPersonnes();
+  });
+
   async function chargerPersonnes() {
     try {
       const r = await fetch("/api/personnes");
@@ -422,15 +457,14 @@ PAGE = """<!doctype html>
       const e = d.enrolement;
       const enCours = e && e.etat === "en_cours";
       $("ajouter").disabled = !d.camera || enCours;
-      if (enCours) {
-        let conseil = "Regarde BeeDoo et tourne doucement la tête.";
-        if (e.derniere === "aucun_visage") conseil = "Je ne te vois pas : mets-toi face à moi.";
-        if (e.derniere === "trop_petit") conseil = "Tu es trop loin : approche-toi (visage " + e.taille + " px, il en faut " + e.min_taille + ").";
-        $("personnes-info").textContent = conseil + " Images valides : " + e.ajoutes + "/" + e.total + ".";
-      } else if (e && e.etat === "termine") {
+      $("photomaton").hidden = !enCours;
+      if (enCours) montrerPhotomaton(e);
+      else if (e && e.etat === "termine") {
         $("personnes-info").textContent = "C'est fait : " + e.ajoutes + " images enregistrées. Éloigne-toi un instant, puis reviens : je te saluerai.";
       } else if (e && e.etat === "echec") {
         $("personnes-info").textContent = "Pas assez d'images valides (" + e.ajoutes + "). Approche-toi, éclaire ton visage et réessaie.";
+      } else if (e && e.etat === "annule") {
+        $("personnes-info").textContent = "Ajout arrêté. S'il s'est trompé de prénom, efface la personne dans la liste.";
       } else if (!d.camera) {
         $("personnes-info").textContent = "Caméra non connectée.";
       }

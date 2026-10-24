@@ -56,8 +56,8 @@ class FauxEnrolement:
     en_cours = False
 
     def status(self):
-        return {"etat": "libre", "ajoutes": 0, "total": 6, "essais": 0, "derniere": None, "taille": None,
-                "min_taille": 60}
+        return {"etat": "libre", "ajoutes": 0, "total": 6, "essais": 0, "pose": None, "consigne": None,
+                "derniere": None, "taille": None, "min_taille": 60}
 
     def start(self, nom, apres=None):
         return False

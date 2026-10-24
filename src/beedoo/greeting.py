@@ -3,8 +3,10 @@
 Les logs ne contiennent pas le prénom (règle du dépôt : pas d'identité dans les logs).
 """
 
+import json
 import logging
 import random
+from pathlib import Path
 
 from beedoo.runtime import Runtime
 from beedoo.state import State
@@ -18,6 +20,22 @@ PHRASES = (
     "Salut {nom} ! Ça va ?",
     "Oh, {nom} ! Bonjour !",
 )
+
+FICHIER_PERSONNALISEES = "salutations.json"
+
+
+def salutation_personnalisee(data_dir: Path, person: str) -> str | None:
+    """Phrase de `data/salutations.json` pour cette personne (identifiant, ex. « lea »), sinon None.
+
+    Le fichier est un objet JSON `{"identifiant": "phrase"}`. Il reste dans `data/` (donnée personnelle,
+    jamais versionnée) et il est relu à chaque salutation : pas besoin de redémarrer après une modification.
+    """
+    try:
+        contenu = json.loads((data_dir / FICHIER_PERSONNALISEES).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    phrase = contenu.get(person) if isinstance(contenu, dict) else None
+    return phrase.strip() if isinstance(phrase, str) and phrase.strip() else None
 
 
 class Salutation:
@@ -43,7 +61,8 @@ class Salutation:
         except ValueError:
             return
         try:
-            runtime.speaker.say(self._rng.choice(PHRASES).format(nom=nom))
+            phrase = salutation_personnalisee(runtime.config.data_dir, event.person)
+            runtime.speaker.say(phrase or self._rng.choice(PHRASES).format(nom=nom))
         finally:
             try:
                 runtime.machine.go(avant)

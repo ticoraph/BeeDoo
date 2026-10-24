@@ -56,7 +56,7 @@ class Beedoo(ReachyMiniApp):
         runtime = Runtime(config=config, settings=settings, gestes=GesturePlayer(reachy_mini, suivi),
                           suivi=suivi, miniapps=toutes(), memoire=MemoryStore(config.data_dir),
                           speaker=Speaker(reachy_mini, config, settings), faces=faces, greeter=Greeter(),
-                          enrolement=Enrollment(get_frame, recognizer))
+                          enrolement=Enrollment(get_frame, recognizer, annoncer=lambda texte: runtime.speaker.say(texte)))
         vision = VisionLoop(get_frame, recognizer.identify, runtime.greeter, Salutation(runtime).on_event,
                             active=lambda: not runtime.enrolement.en_cours)
         runtime.vision = vision

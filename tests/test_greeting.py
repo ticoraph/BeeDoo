@@ -1,3 +1,4 @@
+import json
 import random
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import pytest
 pytest.importorskip("reachy_mini")
 
 from beedoo.config import Config
-from beedoo.greeting import PHRASES, Salutation
+from beedoo.greeting import PHRASES, Salutation, salutation_personnalisee
 from beedoo.runtime import Runtime
 from beedoo.settings import Settings
 from beedoo.state import State
@@ -91,3 +92,27 @@ def test_returns_to_veille_even_if_speaking_fails(monde):
 
 def test_phrases_all_use_the_name():
     assert all("{nom}" in phrase for phrase in PHRASES)
+
+
+def test_custom_greeting_replaces_the_usual_one(monde, tmp_path):
+    runtime, salutation = monde
+    (tmp_path / "salutations.json").write_text(json.dumps({"lea": "Phrase secrète de test !"}), encoding="utf-8")
+    salutation.on_event(Event(SALUE, "lea"))
+    assert runtime.speaker.dit == ["Phrase secrète de test !"]
+    assert runtime.gestes.joues == ["antennes_content"]
+
+
+def test_custom_greeting_only_for_the_right_person(tmp_path):
+    (tmp_path / "salutations.json").write_text(json.dumps({"lea": "Coucou spécial"}), encoding="utf-8")
+    assert salutation_personnalisee(tmp_path, "lea") == "Coucou spécial"
+    assert salutation_personnalisee(tmp_path, "jeanne") is None
+
+
+@pytest.mark.parametrize("contenu", ["pas du json", "[1, 2]", '{"lea": 3}', '{"lea": "  "}'])
+def test_broken_custom_greeting_file_falls_back(tmp_path, contenu):
+    (tmp_path / "salutations.json").write_text(contenu, encoding="utf-8")
+    assert salutation_personnalisee(tmp_path, "lea") is None
+
+
+def test_missing_custom_greeting_file_falls_back(tmp_path):
+    assert salutation_personnalisee(tmp_path, "lea") is None

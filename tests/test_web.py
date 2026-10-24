@@ -121,14 +121,19 @@ class FauxEnrolement:
     def __init__(self):
         self.demandes = []
         self.occupe = False
+        self.annulations = 0
 
     @property
     def en_cours(self):
         return self.occupe
 
     def status(self):
-        return {"etat": "libre", "ajoutes": 0, "total": 6, "essais": 0, "derniere": None, "taille": None,
-                "min_taille": 60}
+        return {"etat": "libre", "ajoutes": 0, "total": 6, "essais": 0, "pose": None, "consigne": None,
+                "derniere": None, "taille": None, "min_taille": 60}
+
+    def annuler(self):
+        self.annulations += self.occupe
+        return self.occupe
 
     def start(self, nom, apres=None):
         if self.occupe:
@@ -178,6 +183,22 @@ def test_enrollment_busy_and_no_camera(monde_visages):
     assert client.post("/api/personnes", json={"prenom": "Paul"}, headers=LOCAL).status_code == 409
     runtime.enrolement = None
     assert client.post("/api/personnes", json={"prenom": "Paul"}, headers=LOCAL).status_code == 503
+
+
+def test_cancel_enrollment(monde_visages):
+    runtime, client = monde_visages
+    assert client.delete("/api/enrolement", headers=LOCAL).status_code == 409  # rien en cours
+    runtime.enrolement.occupe = True
+    assert client.delete("/api/enrolement", headers=LOCAL).status_code == 200
+    assert runtime.enrolement.annulations == 1
+    runtime.enrolement = None
+    assert client.delete("/api/enrolement", headers=LOCAL).status_code == 409
+
+
+def test_page_shows_the_photobooth_instruction():
+    from beedoo.ui.page import PAGE
+
+    assert 'id="photomaton"' in PAGE and "e.consigne" in PAGE and "/api/enrolement" in PAGE
 
 
 def test_rename_and_duplicate(monde_visages):

@@ -307,6 +307,12 @@ def create_app(runtime: Runtime, port: int, mot_de_passe: str | None = None,
             raise HTTPException(status_code=409, detail="un enrôlement est déjà en cours")
         return {"ok": True}
 
+    @app.delete("/api/enrolement")
+    def annuler_enrolement() -> dict:
+        if runtime.enrolement is None or not runtime.enrolement.annuler():
+            raise HTTPException(status_code=409, detail="aucun ajout en cours")
+        return {"ok": True}
+
     @app.patch("/api/personnes/{pid}")
     def renommer(pid: str, requete: PrenomRequest) -> dict:
         pid = personne(pid)
