@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+pytest.importorskip("reachy_mini")  # absent de la CI
+
 from beedoo import tracking
 from beedoo.tracking import LACET_MAX, PERTE, POIDS_DAEMON, ZONE_MORTE, CibleLacet, HeadTracker, erreur_lacet
 from reachy_mini.utils import create_head_pose
